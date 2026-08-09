@@ -239,6 +239,9 @@ Every one of these shipped, looked fine, and was silently wrong. They are all th
 | `except Exception: return []` around an API call | A rejected query looked identical to "no results" | Never let a failure and an empty result share a representation |
 | A workflow triggered by an external event sat on a feature branch | The event fired; nothing received it; no error anywhere | Event-triggered CI usually only runs from the default branch |
 | Two checkouts of the same repo; only one was deployed | Merging reported success while changing nothing | Know which copy actually runs. Print the version at startup |
+| A guard that checked whether a tool was *installed* rather than whether it *worked* | The binary is always on disk, so the check was always true and the guard never fired once | **A capability check must exercise the capability.** `which(tool)` is not `tool works` |
+| The quality step failed and the pipeline shipped its degraded fallback | "Is it available?" was asked before running; nobody asked "did it work?" after | Gate on the OUTPUT, not on the tool. Availability and success are different questions |
+| A machine woke from sleep with no DNS and the job ran anyway | Every delivery channel failed at once, which looked like a delivery bug | Check your preconditions exist before consuming a once-a-day action |
 | A dry-run flag with a name one character off from the real one | It sent real email while reporting a dry run | Make destructive-vs-safe modes fail loudly when misconfigured |
 
 **The meta-lesson, and the one to tell your agent:** *run it, then check the result against

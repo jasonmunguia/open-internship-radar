@@ -99,7 +99,7 @@ def send_email(subject, body_html):
         print(f"[guard] active Composio account is a work mailbox ({active}) — using GitHub relay instead")
         return _queue_github(subject, body_html)
 
-    if active.endswith(TO_ADDR.split("@")[-1]):   # same mailbox -> insert, not send
+    if active.endswith("example.edu"):
         ok, res = _cx("GMAIL_INSERT_MESSAGE", {
             "raw": _raw_message(subject, body_html, f"Internship Radar <{TO_ADDR}>", TO_ADDR),
             "user_id": "me"})
@@ -189,14 +189,42 @@ def report_local_health(status, sent):
     except Exception as ex:
         print(f"[warn] could not publish local heartbeat: {ex}")
 
-def _rerank_available():
-    """Can the local Claude CLI actually re-rank right now? Import + binary check: cheap, and
-    the failure we care about (no CLI, no session) surfaces at exactly these two points."""
+def _mark_deferred(reason):
+    """Record WHY we deferred so the dead-man's-switch tells waiting apart from broken."""
+    try:
+        hb = os.path.join(REPO_DIR, "data", "digest_heartbeat.json")
+        cur = json.load(open(hb)) if os.path.exists(hb) else {}
+        cur["deferred_at"] = datetime.now().isoformat(timespec="seconds")
+        cur["deferred_reason"] = reason
+        json.dump(cur, open(hb, "w"), indent=1)
+    except Exception:
+        pass
+
+
+def _network_up(host="api.github.com"):
+    """A Mac woken from sleep often has no DNS yet. Sending into that burns the day's send on
+    every channel at once. Observed 2026-08-09: 'Could not resolve host: github.com'."""
+    import socket
+    try:
+        socket.getaddrinfo(host, 443)
+        return True
+    except Exception:
+        return False
+
+
+def _rerank_available(timeout=45):
+    """ACTUALLY invoke the CLI. The previous version returned shutil.which("claude") is not
+    None -- true whenever the binary is on disk, i.e. always -- so the defer guard never fired
+    once and degraded digests shipped for days. A capability check must exercise the
+    capability, not assert its existence."""
+    import subprocess
     try:
         from radar.rerank import rerank            # noqa: F401
-        import shutil
-        return shutil.which("claude") is not None
-    except Exception:
+        r = subprocess.run(["claude", "-p", "Reply with exactly: OK"],
+                           capture_output=True, text=True, timeout=timeout)
+        return "OK" in (r.stdout or "")
+    except Exception as ex:
+        print(f"[defer] claude probe failed: {type(ex).__name__}")
         return False
 
 
@@ -237,10 +265,19 @@ def main():
     # borderline calls get a semantic second opinion before anything is hidden. Updates scores in place.
     if not DRY:
         try:
-            from radar.rerank import rerank
+            from radar.rerank import rerank, last_run_quality, reset_quality
             new_drops = [r for r in allrows if r.get("ts", 0) > since and r.get("score", 0) >= 40
                          and r.get("cluster") != "newsletter"]   # gov included (T1 target)
+            reset_quality()
             rerank(new_drops)
+            _ok_b, _bad_b = last_run_quality()
+            # "Is it available" and "did it work" are different questions. Overnight the probe
+            # passed and then every batch timed out at 120s, so keyword-only scores shipped --
+            # the exact degradation this logic exists to prevent. Judge the OUTPUT, not the tool.
+            if _bad_b and _bad_b >= _ok_b and datetime.now().hour < 18:
+                print(f"[defer] re-rank degraded ({_ok_b} ok / {_bad_b} failed) — not sending")
+                _mark_deferred(f"re-rank degraded: {_ok_b} ok / {_bad_b} failed batches")
+                return
         except Exception as ex:
             print(f"[warn] rescue rerank unavailable: {ex}")
 
@@ -283,18 +320,15 @@ def main():
     if not DRY and _sent_today():
         print("digest already sent today — nothing to do")
         return
+    if not DRY and not _network_up() and datetime.now().hour < 18:
+        print("[defer] no network (likely just woke) — not sending; will retry")
+        _mark_deferred("no network at wake")
+        return
     if not DRY and not _rerank_available() and datetime.now().hour < 18:
         # Record the deferral so the dead-man's-switch can tell "waiting for a usable machine"
         # apart from "the digest is broken". Without this, every deferred morning would page
         # the operator with a false stale-digest alarm and the alert would stop meaning anything.
-        try:
-            hb = os.path.join(REPO_DIR, "data", "digest_heartbeat.json")
-            cur = json.load(open(hb)) if os.path.exists(hb) else {}
-            cur["deferred_at"] = datetime.now().isoformat(timespec="seconds")
-            cur["deferred_reason"] = "local Claude re-rank unavailable"
-            json.dump(cur, open(hb, "w"), indent=1)
-        except Exception:
-            pass
+        _mark_deferred("local Claude re-rank unavailable")
         print("[defer] re-rank unavailable and it is before 18:00 — not sending; will retry")
         return
 

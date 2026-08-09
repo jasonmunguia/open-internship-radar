@@ -27,6 +27,9 @@ def _prompt(batch):
             f"ROLES:\n{json.dumps(roles)}\n\n"
             f"Return ONLY a JSON array: [{{\"i\":<idx>,\"fit\":<0-100>,\"why\":\"<=10 words\"}}]. No prose.")
 
+_OK, _FAILED = {"n": 0}, {"n": 0}
+
+
 def rerank(items, band=(40, 82), batch_size=20, timeout=120):
     """Re-score items whose keyword score is in the borderline band. Mutates & returns items.
     Degrades gracefully: on any failure the keyword score stands."""
@@ -46,4 +49,17 @@ def rerank(items, band=(40, 82), batch_size=20, timeout=120):
                 r["rerank_why"] = v.get("why", "")
         except Exception as ex:
             print(f"[warn] rerank batch failed, keeping keyword scores: {ex}")
+            _FAILED["n"] += 1
+        else:
+            _OK["n"] += 1
     return items
+
+
+def last_run_quality():
+    """(ok_batches, failed_batches). The caller MUST check this: a re-rank that silently kept
+    keyword scores produced exactly the degraded output the defer logic exists to prevent."""
+    return _OK["n"], _FAILED["n"]
+
+
+def reset_quality():
+    _OK["n"] = _FAILED["n"] = 0
