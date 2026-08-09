@@ -1,0 +1,114 @@
+# TOOLS — what this system uses, and why
+
+The radar is a **deterministic spine with LLM judgment at the joints.** Fetching, parsing,
+scoring, and delivery are plain Python that run unattended in GitHub Actions with no model
+involved. A model is reached only where regex genuinely cannot decide. That split is the
+architecture, not an implementation detail — if you replace the model, the spine still runs.
+
+Everything below is what a fresh clone actually depends on. Nothing here is optional
+background: each entry is load-bearing somewhere in the pipeline.
+
+## Where each source type is reached, and by what
+
+| Source type | Count | Reached by | Detection lag |
+|---|---|---|---|
+| Direct ATS APIs | 112 | plain HTTPS JSON — Greenhouse, Ashby, Lever, Workday, Getro, Consider, SmartRecruiters, Eightfold | <= 2h (poll interval) |
+| Job-list GitHub repos | 26 | GitHub raw markdown fetch | repo update lag + <= 2h |
+| Newsletters | 7 | Substack JSON | days |
+| Watch pages | 6 | HTML fetch, Scrapling when blocked | <= 2h |
+| SEC Form D | — | EDGAR full index (free, no key) | daily |
+
+Walled employers (Google, Microsoft, LinkedIn, Apple, Amazon, Goldman) publish no pollable
+board. They are reachable ONLY through the job-list repos — which is why `zshah101`
+(~4,285 endpoints across 12 ATS platforms) matters more than any single direct feed.
+
+## Tools, and the specific job each does
+
+**Python 3.11 + PyYAML** — the whole spine. No framework.
+
+**Scrapling** (`radar/scrapling_fetch.py`, `radar/tiers.py`) — anti-bot page fetching.
+The capability that matters is not "scraping a website"; it is **reaching any publicly
+readable page past an anti-bot layer**. That is why it can read logged-out LinkedIn company
+pages for follower and employee counts at zero cost — the fact that unlocks company tiering
+without a paid enrichment API. If you find yourself reaching for a credits-based data vendor,
+check first whether the data is on a public page.
+
+**GitHub Actions** — the 2-hourly poll (`.github/workflows/poll.yml`), the click logger
+(`apply-log.yml`), and the dead-man's-switch (`heartbeat.yml`). Cloud-side, no laptop needed.
+
+**launchd** (`~/Library/LaunchAgents/com.internship-digest.plist`) — the daily digest,
+retried hourly 7:20–18:20. It must run locally because the semantic re-rank needs the local
+Claude session. launchd does NOT inherit an interactive shell's environment, which is why
+config lives in `config/person.yaml` rather than env vars.
+
+**Claude Code CLI** — the semantic re-rank, invoked as a subprocess. **No API key.** This is
+the BYOK story: the operator's own Claude subscription does the judgment work. Any coding-agent
+CLI can be substituted; see "LLM joints" below for exactly what it must do.
+
+**Composio MCP** (`GMAIL_SEND_EMAIL`) — email fallback. Routes by account alias; it silently
+defaults to the wrong mailbox unless `account:` is passed explicitly.
+
+**mailer skill** (`~/.claude/tools/mailer.py`) — primary SMTP send, credentials in Keychain.
+Preferred over Composio because it produces a clean subject with no `[owner/repo]` prefix.
+
+**gh CLI** — repo operations and the issue relay used as a last-resort delivery channel.
+
+**Vercel** (`api/a.js`) — the click relay. A tap is recorded, then 302s to the posting.
+Writes go through `repository_dispatch` so concurrent taps serialise inside Actions rather
+than racing a file SHA.
+
+**SEC EDGAR** via the `free-apis` skill — Form D filings, the funding tier signal.
+
+## LLM joints — the only four places a model is used
+
+Everything else is deterministic. If you swap models, these are the contracts to preserve.
+
+1. **Semantic re-rank** (`radar/rerank.py`) — every new drop scoring >= 40 gets a second
+   opinion before anything is hidden. Rule scoring is deliberately blunt; this catches its
+   borderline calls.
+2. **Slug resolution** (`radar/tiers.py`) — only after the deterministic chain fails: slug
+   guesses, then a search-engine lookup. A model is asked which LinkedIn company page is
+   really this company.
+3. **Title-variant discovery** (`data/dropped_unmatched.jsonl`) — titles dropped at T1/T2
+   companies are mined for real variants no pattern knows. It **proposes** patterns; it never
+   auto-adds them.
+4. **Name-collision adjudication** — when funding says serious and follower count says tiny,
+   both signals are distrusted and the case is handed over.
+
+## Failure modes and what they look like
+
+- **Wrong-company 200s.** LinkedIn 301s an unknown slug to a nearest match on a foreign host.
+  `/company/uber` resolved to a UK creative agency and passed a substring name check, tiering
+  Uber at T3 on 5,984 followers. Gated now on the final URL's slug plus exact-prefix name
+  matching. **A 404 is safe; a wrong 200 is the dangerous one.**
+- **Rolling vs persistent state.** `funded_watch.json` is a ~14-day window, not a history.
+  Treating it as history left the funding signal dead for every company that raised earlier.
+  `radar/funding_history.py` accumulates permanently.
+- **repository_dispatch only fires workflows on the DEFAULT branch.** A workflow on a feature
+  branch receives nothing, silently.
+- **Two checkouts.** `REPO_DIR` is hardcoded to `~/.internship-radar`; the dev clone is
+  separate. Merging to main deploys nothing until that checkout pulls.
+- **Dedup on normalised keys, never display strings.** The same req arrives from six boards
+  with six spellings of the company name.
+
+## Deliberately not used
+
+**YC Bookface** — `radar/bookface.py` is written and functional but called by nothing.
+the operator's access runs through an employer's YC account; logging in would leave job-search
+activity attributable to him inside an org he is leaving. Operating-security decision, not a
+technical one. Re-enable only against a YC account he controls independently.
+
+**Handshake** — same shape of exclusive-channel value, declined 2026-08-08.
+
+**Paid enrichment (Apollo / Clay / FullEnrich)** — the data these were wanted for (follower
+counts, headcount) sits on public pages that Scrapling reads for free. Check the public page
+before spending a credit.
+
+## Conventions that are not obvious
+
+- Config is the interface: `person.yaml` (who), `profile.yaml` (what they want),
+  `sources.yaml` (where to look). Forking for someone else means editing those three.
+- Scoring is blind to the operator's resume. It grades **role family** and **company caliber**
+  only. See `config/profile.yaml` on why `angles` is paused.
+- Nothing expires on age. The apply list is a queue worked to zero; rows leave only when tapped.
+- Delivery never originates from a work domain. `person.yaml` hard-blocks them.

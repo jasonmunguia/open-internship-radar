@@ -1,0 +1,33 @@
+name: apply-log
+# Serialises click writes: the Vercel relay only fires an event, this appends the row.
+on:
+  repository_dispatch:
+    types: [radar-click]
+permissions:
+  contents: write
+concurrency:
+  group: apply-log          # queue concurrent taps; never two commits racing the same SHA
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Append click
+        env:
+          P: ${{ toJSON(github.event.client_payload) }}
+        run: |
+          mkdir -p data
+          python3 - <<'PY'
+          import json, os, time
+          p = json.loads(os.environ["P"])
+          act = p.get("action", "applied")
+          row = {"job_id": p.get("job_id",""), "action": act,
+                 "ts": int(p.get("ts", time.time()*1000))//1000, "url": p.get("url","")}
+          with open("data/applied.jsonl","a") as fh: fh.write(json.dumps(row)+"\n")
+          PY
+          git config user.name  "internship-radar"
+          git config user.email "actions@github.com"
+          git add data/applied.jsonl
+          git commit -m "click: ${{ github.event.client_payload.action }} [skip ci]" || exit 0
+          git pull --rebase --autostash -q || true
+          git push -q

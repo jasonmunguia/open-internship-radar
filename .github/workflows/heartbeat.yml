@@ -1,0 +1,22 @@
+name: heartbeat
+on:
+  schedule:
+    - cron: "0 15 * * *"   # daily 15:00 UTC (~8am PDT) — dead-man's switch + Monday summary
+  workflow_dispatch: {}
+permissions:
+  contents: read
+  issues: write
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Check pulse
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python -m radar.heartbeat

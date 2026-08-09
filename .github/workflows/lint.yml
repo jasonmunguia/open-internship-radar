@@ -1,0 +1,38 @@
+name: lint
+# Static analysis on every push. This exists because `poll.py` used `re.sub` without importing
+# `re` for the entire life of the project — the NameError was swallowed by a silent `except`,
+# so the SEC funding radar never ran and nothing reported a problem. pyflakes catches that class
+# of bug in under a second. Never remove this.
+on:
+  push:
+    paths: ["radar/**.py", ".github/workflows/lint.yml"]
+  workflow_dispatch: {}
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install pyflakes
+      - name: Fail on undefined names
+        run: |
+          python -m pyflakes radar/*.py > lint.txt || true
+          cat lint.txt
+          if grep -q "undefined name" lint.txt; then
+            echo "::error::undefined name(s) — the bug class that silently killed refresh_funded()"
+            exit 1
+          fi
+      - name: Import smoke test
+        # Catches missing dependencies and broken imports — the class of bug that took the
+        # watchdog down on 2026-07-31 (settings.py pulled in PyYAML, heartbeat.yml never installed it).
+        run: |
+          pip install -r requirements.txt
+          for m in radar/*.py; do
+            mod="radar.$(basename "$m" .py)"
+            [ "$mod" = "radar.__init__" ] && continue
+            python -c "import importlib,sys; importlib.import_module('$mod')" \
+              || { echo "::error::$mod failed to import"; exit 1; }
+          done
+          echo "all modules import cleanly"

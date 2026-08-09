@@ -1,0 +1,17 @@
+# WHO THIS RADAR IS FOR. Copy to person.yaml (gitignored) and edit.
+# Forking is three files and nothing else: person.yaml (who), profile.yaml (what
+# you want), sources.yaml (where to look). No code is person-specific by design.
+
+identity:
+  name: Your Name
+  github_handle: your-github-handle
+  repo: your-github-handle/internship-radar
+  contact_email: you@example.edu      # sent in API User-Agent headers, as good manners
+
+delivery:
+  to: you@example.edu                 # where you READ mail
+  send_as: personal                   # which sending account (see SETUP.md)
+  # Never originate a job search from a mailbox your employer can see. These are
+  # hard-blocked as senders; add every domain you must not send FROM.
+  work_domains: [your-employer.com]
+  relay_base: ""                      # your Vercel click-relay URL; blank = raw links

@@ -1,0 +1,106 @@
+# WHAT YOU WANT. Copy to profile.yaml and edit — this is the file that decides everything.
+# Read METHODOLOGY.md sections 5 and 9 first; the numbers below are arithmetic, not taste.
+identity:
+  name: Your Name
+  school: Your University, Your Major, Class of 20XX
+  terms_wanted: [fall-2026, winter-2027, spring-2027, summer-2027]
+  location: any US (state your real constraint — it is used as a hard gate)
+
+
+# Angles are OPTIONAL and OFF by default. They inject a per-family pitch line into each
+# brief. Leave paused unless you maintain one resume per family — otherwise every brief
+# gets framed by whichever single resume you happened to write first, which quietly biases
+# you toward roles that resume already fits.
+angles_paused: true
+angles: {}
+
+
+# Cluster taxonomy: title/dept regex fragments -> weight + angle to lead with
+clusters:
+  # All families carry EQUAL weight. Keep it that way unless you genuinely prefer one: an
+  # unequal weight is you deciding which career you want, in a config file, months before you
+  # have the information to decide. The intended use is one resume per
+  # family, so no family outranks another. 40 + T3 tier (+20) == 60 == high_fit_threshold:
+  # a role in any family at a T3-or-better company alerts; below T3 stays silent.
+  deployment:
+    weight: 40
+    angle: ops_deployment
+    # Group titles by the JOB THEY DESCRIBE, not by their words. Note that Deployment
+    # STRATEGIST is business-side while Forward-Deployed ENGINEER is not — same phrase, different job.
+    patterns: ["deployment strateg", "forward.?deployed strateg", "implementation strateg", "solutions intern", "field ops", "customer success", "implementation consultant"]
+  cos_bizops:
+    weight: 40
+    angle: founder
+    patterns: ["chief of staff", "founder'?s associate", "business operations", "biz ?ops",
+               "strateg.* (and|&) op", "op.* (and|&) strateg", "corporate strategy", "strategy intern",
+               "strategy (and|&) analytics", "special projects", "revenue operations", "rev ?ops",
+               "growth operations", "strategy associate", "strategy & operations"]
+  gtm_bd:
+    weight: 40
+    angle: gtm
+    patterns: ["go.?to.?market", "gtm", "business development", "\\bbd\\b", "growth", "partnership", "capture", "commercial intern", "revenue", "sales (strategy|ops|intern)"]
+  product:
+    weight: 40
+    angle: product
+    patterns: ["product manage", "\\bapm\\b", "\\brpm\\b", "product intern", "product ops", "product analyst", "technical program",
+               "product development intern", "associate product builder", "product research"]
+  consulting:
+    weight: 40
+    angle: consulting
+    patterns: ["business analyst", "consultant", "consulting", "strategy analyst"]
+  vc:
+    weight: 40
+    angle: founder
+    patterns: ["investment intern", "venture", "investor", "platform intern", "investment analyst"]
+  ops_supply:
+    weight: 40
+    angle: ops_deployment
+    patterns: ["supply chain", "operations intern", "program manage", "project manage"]
+
+# Company tiers (case-insensitive substring match on company name)
+tiers:
+  # OPTIONAL override lists. Tier is normally COMPUTED from public signals (see radar/tiers.py);
+  # these exist only for prestige no metric can see — top consulting firms, intelligence
+  # agencies, famous-but-small startups. Leave empty and the computed bands do the work.
+  dream: []    # -> T1
+  target: []   # -> T2
+  watch: []    # -> T3
+
+# Bonus keywords anywhere in posting (+5 each, cap +15)
+bonus_keywords: [robotic, defense, autonom, "physical ai", hardware, aerospace, manufacturing, intelligence, national security, deep tech]
+
+# Off-cycle terms rank EQUAL to summer here. If off-season is YOUR arbitrage, give it a
+# bonus; if you can only take summers, gate on it instead. Patterns retained
+# only to LABEL the term in the digest; they no longer contribute score.
+offcycle_patterns: ["fall", "winter", "spring", "off.?season", "off.?cycle", "co-?op"]
+
+# Industry classification -> daily digest color-coding. Company substring match;
+# falls back to source (VC board -> vc_portfolio, usajobs -> gov) then startup_other.
+industries:
+  defense:      [anduril, palantir, saronic, shield, vannevar, chaos, hadrian, castelion, helsing, epirus, mach industries, allen control, regent, true anomaly, epirus]
+  space:        [spacex, relativity, stoke, varda, k2 space, astranis, rocket lab, vast, apex]
+  robotics:     [figure, physical intelligence, skild, applied intuition, gecko, zoox, nuro, waymo, boston dynamics, dexterity, chef robotics, path robotics, field ai, bright machines, machina, divergent, formic, cobot, bracket, bot auto, waabi, neuralink, boring]
+  ai_lab:       [openai, anthropic, mistral, thinking machines, world labs, safe superintelligence, scale ai, cursor, anysphere, cognition, decagon, sierra, mercor, clay]
+  corporate:    [google, meta, amazon, apple, nvidia, microsoft, tesla, salesforce, adobe, intel, amd, qualcomm, cisco, oracle, ibm, walmart, target, disney, netflix, uber, airbnb, stripe, databricks, snowflake, servicenow, datadog, coinbase, robinhood, doordash, snap, pinterest, instacart, palo alto, home depot]
+  consulting:   [mckinsey, bain, bcg]
+
+scoring:
+  high_fit_threshold: 60
+  fresh_days: 28   # 4-week intake window (was 14). Rows never expire on age alone — the
+                   # queue drops them only when tapped; see radar/queue_state.py.
+  # EDIT THESE. They are hard gates, not preferences — anything failing them never scores.
+  # The shipped values assume an undergraduate seeking internships, fellowships, and co-ops.
+  # NOT full-time / new-grad (those are 2+ yrs out) and NOT senior IC/manager titles.
+  gate_patterns: ["intern", "co-?op", "fellow", "apprentice", "student", "undergrad", "university program", "campus", "sophomore", "junior year"]
+  # Any hit in the TITLE disqualifies, even if a gate pattern also matched.
+  # NB: "full-time" is NOT excluded, because a full-time *internship* is still an internship.
+  # NB: plain "manager" is NOT excluded — "Product/Program Manager Intern" are valid. Only senior titles.
+  exclude_patterns: ["new grad", "new-grad", "\\bsenior\\b", "\\bstaff\\b",
+    "\\bdirector\\b", "\\bhead of\\b", "\\bprincipal\\b", "senior manager", "general manager",
+    "\\bvp\\b", "vice president", "\\bmba\\b", "phd", "graduate program",
+    # engineering/design/research titles, excluded for a business-side candidate. INVERT THIS
+    # block if you are technical — it is the single most likely line to be wrong for you.
+    "software engineer", "\\bswe\\b", "hardware engineer", "firmware", "\\bml engineer\\b",
+    "machine learning engineer", "research scientist", "research engineer", "\\bdeveloper\\b",
+    "forward.?deployed engineer", "electrical engineer", "mechanical engineer", "data engineer",
+    "systems engineer", "\\bdesigner\\b", "design intern", "silicon", "\\basic\\b", "\\bsoc\\b"]

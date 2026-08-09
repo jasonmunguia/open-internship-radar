@@ -1,0 +1,204 @@
+# Sources polled every 30 min by GitHub Actions.
+# ats entries verified 2026-07-26 (see agent research); github_repos are markdown job-list repos.
+
+# Verified live 2026-07-26. Not includable (no public JSON API / bot-walled):
+# Tesla (Akamai), Google, Meta (GraphQL+CSRF), McKinsey (TLS-blocked), Bain (Avature HTML),
+# In-Q-Tel (iCIMS HTML), Founders Fund (VentureLoop HTML), workatastartup (auth-gated),
+# Radiant (Greenhouse board dark as of 2026-07-26 — recheck later). Those stay covered via job-list repos.
+ats:
+  - {name: Palantir, ats: lever, token: palantir}
+  - {name: Shield AI, ats: lever, token: shieldai}
+  - {name: Anduril, ats: greenhouse, token: andurilindustries}
+  - {name: Scale AI, ats: greenhouse, token: scaleai}
+  - {name: Vannevar Labs, ats: greenhouse, token: vannevarlabs}
+  - {name: Chaos Industries, ats: greenhouse, token: chaosindustries}
+  - {name: Figure AI, ats: greenhouse, token: figureai}
+  - {name: Skild AI, ats: greenhouse, token: skildai-careers}
+  - {name: SpaceX, ats: greenhouse, token: spacex}
+  - {name: KoBold Metals, ats: greenhouse, token: koboldmetals}
+  - {name: Ramp, ats: ashby, token: ramp}
+  - {name: Applied Intuition, ats: ashby, token: applied}
+  - {name: Mercor, ats: ashby, token: mercor}
+  - {name: Cursor, ats: ashby, token: cursor}
+  - {name: Clay, ats: ashby, token: claylabs}
+  - {name: Decagon, ats: ashby, token: decagon}
+  - {name: Sierra, ats: ashby, token: sierra}
+  - {name: Cognition, ats: ashby, token: cognition}
+  - {name: Saronic, ats: ashby, token: saronic}
+  - {name: Skydio, ats: ashby, token: skydio}
+  - {name: Hadrian, ats: ashby, token: hadrian-automation}
+  - {name: Physical Intelligence, ats: ashby, token: physicalintelligence}
+  - {name: Gecko Robotics, ats: ashby, token: gecko-robotics}
+  - {name: Base Power, ats: ashby, token: base-power}
+  - {name: Castelion, ats: manatal, token: castelion-corporation}
+  - {name: 8VC portfolio, ats: getro, token: 1005}
+  - {name: Lux portfolio, ats: getro, token: 103}
+  - {name: a16z portfolio, ats: a16z, token: andreessen-horowitz}
+  - {name: Amazon, ats: amazon, token: amazon}
+  - {name: BCG, ats: bcg, token: bcg}
+  - {name: Rippling, ats: rippling, token: rippling}
+  - {name: Pear portfolio, ats: ashby, token: pear-vc}
+  # verified 2026-07-29 — Musk-ecosystem + frontier labs previously missing
+  - {name: Neuralink, ats: greenhouse, token: neuralink}
+  - {name: xAI, ats: greenhouse, token: xai}
+  # VC portfolio boards verified 2026-07-26 (Index Ventures DROPPED — required scraped internal ES creds)
+  - {name: General Catalyst portfolio, ats: getro, token: "222"}
+  - {name: Khosla portfolio, ats: getro, token: "257"}
+  - {name: BITKRAFT portfolio, ats: getro, token: "3095"}
+  - {name: Accel portfolio, ats: getro, token: "8672"}
+  - {name: Antler portfolio, ats: getro, token: "7715"}
+  - {name: Sequoia portfolio, ats: consider, token: "jobs.sequoiacap.com|sequoia-capital"}
+  - {name: Greylock portfolio, ats: consider, token: "jobs.greylock.com|greylock-partners"}
+  - {name: Kleiner Perkins portfolio, ats: consider, token: "jobs.kleinerperkins.com|kleiner-perkins"}
+  - {name: Contrary portfolio, ats: consider, token: "jobs.contrary.com|contrary"}
+  - {name: Battery portfolio, ats: consider, token: "jobs.battery.com|battery-ventures"}
+  - {name: NEA portfolio, ats: consider, token: "careers.nea.com|nea"}
+  - {name: Lightspeed portfolio, ats: consider, token: "jobs.lsvp.com|lightspeed"}
+  - {name: Bessemer portfolio, ats: consider, token: "jobs.bvp.com|bessemer-ventures"}
+  - {name: a16z speedrun network, ats: speedrun, token: speedrun}
+  # Expansion batch verified 2026-07-26 — space / robotics / defense / AI labs
+  # SPACE & AEROSPACE
+  - {name: Relativity Space, ats: greenhouse, token: relativity}
+  - {name: Stoke Space, ats: greenhouse, token: stokespacetechnologies}
+  - {name: Varda Space, ats: greenhouse, token: vardaspace}
+  - {name: K2 Space, ats: greenhouse, token: k2spacecorporation}
+  - {name: Astranis, ats: greenhouse, token: astranis}
+  - {name: Rocket Lab, ats: greenhouse, token: rocketlab}
+  - {name: Vast, ats: greenhouse, token: vast}
+  - {name: True Anomaly, ats: greenhouse, token: trueanomalyinc}
+  - {name: Apex Space, ats: ashby, token: apex-technology-inc}
+  # ROBOTICS & PHYSICAL AI
+  - {name: Zoox, ats: lever, token: zoox}
+  - {name: Nuro, ats: greenhouse, token: nuro}
+  - {name: Waymo, ats: greenhouse, token: waymo}
+  - {name: Boston Dynamics, ats: workday, token: "bostondynamics/Boston_Dynamics"}
+  - {name: Dexterity, ats: lever, token: dexterity}
+  - {name: Chef Robotics, ats: lever, token: ChefRobotics}
+  - {name: Path Robotics, ats: greenhouse, token: pathrobotics}
+  - {name: Field AI, ats: lever, token: field-ai}
+  - {name: Bright Machines, ats: lever, token: brightmachines}
+  - {name: Machina Labs, ats: lever, token: MachinaLabs}
+  - {name: Divergent, ats: greenhouse, token: divergent}
+  - {name: Formic, ats: greenhouse, token: formic}
+  - {name: Cobot, ats: ashby, token: cobot}
+  - {name: Bracket Bot, ats: ashby, token: bracket-bot}
+  - {name: Bot Auto, ats: greenhouse, token: botauto}
+  - {name: Waabi, ats: lever, token: waabi}
+  # DEFENSE
+  - {name: Helsing, ats: greenhouse, token: helsing}
+  - {name: Epirus, ats: greenhouse, token: epirus}
+  - {name: Mach Industries, ats: ashby, token: mach}
+  - {name: Allen Control Systems, ats: greenhouse, token: allencontrolsystems}
+  - {name: Regent, ats: ashby, token: regent}
+  # FRONTIER AI LABS
+  - {name: OpenAI, ats: ashby, token: openai}
+  - {name: Anthropic, ats: greenhouse, token: anthropic}
+  - {name: Mistral, ats: ashby, token: "mistral.ai"}
+  - {name: Thinking Machines Lab, ats: ashby, token: thinkingmachines}
+  - {name: World Labs, ats: greenhouse, token: worldlabs}
+  - {name: Safe Superintelligence, ats: ashby, token: ssi}
+  # More VC portfolio boards verified 2026-07-26 (Benchmark/IVP/Coatue/Neo have no public board)
+  - {name: Thrive Capital portfolio, ats: getro, token: "2105"}
+  - {name: Craft Ventures portfolio, ats: getro, token: "340"}
+  - {name: Menlo Ventures portfolio, ats: getro, token: "767"}
+  - {name: Susa Ventures portfolio, ats: getro, token: "386"}
+  - {name: Founders Fund portfolio, ats: getro, token: "13095"}
+  - {name: First Round portfolio, ats: consider, token: "jobs.firstround.com|first-round-capital"}
+  - {name: Initialized portfolio, ats: consider, token: "jobs.initialized.com|initialized"}
+  - {name: Bain Capital Ventures portfolio, ats: consider, token: "jobs.baincapitalventures.com|bain-ventures"}
+  # Household-name corporates verified 2026-07-26 (public JSON APIs — no scraping)
+  # Walled (Apple/Google/Meta/Microsoft/Qualcomm/AMD/Cisco/Oracle/IBM/Goldman/JPM/Walmart/Citadel/Jane St/Two Sigma) stay covered via job-list repos
+  - {name: Nvidia, ats: workday, token: "nvidia@wd5/NVIDIAExternalCareerSite"}
+  - {name: Salesforce, ats: workday, token: "salesforce@wd12/External_Career_Site"}
+  - {name: Adobe, ats: workday, token: "adobe@wd5/external_experienced"}
+  - {name: Intel, ats: workday, token: "intel@wd1/External"}
+  - {name: Disney, ats: workday, token: "disney@wd5/disneycareer"}
+  - {name: Target, ats: workday, token: "target@wd5/targetcareers"}
+  - {name: Home Depot, ats: workday, token: "homedepot@wd5/CareerDepot"}
+  - {name: Palo Alto Networks, ats: workday, token: "paloaltonetworks@wd5/panwexternalcareers"}
+  - {name: Airbnb, ats: greenhouse, token: airbnb}
+  - {name: Stripe, ats: greenhouse, token: stripe}
+  - {name: Databricks, ats: greenhouse, token: databricks}
+  - {name: Coinbase, ats: greenhouse, token: coinbase}
+  - {name: Robinhood, ats: greenhouse, token: robinhood}
+  - {name: Pinterest, ats: greenhouse, token: pinterest}
+  - {name: DoorDash, ats: greenhouse, token: doordashusa}
+  - {name: Instacart, ats: greenhouse, token: instacart}
+  - {name: Datadog, ats: greenhouse, token: datadog}
+  - {name: Snowflake, ats: ashby, token: snowflake}
+  - {name: ServiceNow, ats: smartrecruiters, token: ServiceNow}
+  - {name: Netflix, ats: eightfold, token: "explore.jobs.netflix.net|netflix.com"}
+
+# Substack RSS feeds — new issues appear in the morning digest
+  # Added 2026-08-08. Every token PROBED LIVE against its ATS API before being written
+  # here — a guessed token is a silent dead feed that looks like coverage.
+  # Atlassian, Uber, Capital One, Amex, ServiceTitan, Procore, Flock Safety have NO
+  # public board on Greenhouse/Ashby/Lever; they stay repo-covered.
+  - {name: Roblox, ats: greenhouse, token: roblox}
+  - {name: Figma, ats: greenhouse, token: figma}
+  - {name: Appian, ats: greenhouse, token: appian}
+  - {name: Samsara, ats: greenhouse, token: samsara}
+  - {name: Plaid, ats: ashby, token: plaid}
+  - {name: Brex, ats: greenhouse, token: brex}
+  - {name: Notion, ats: ashby, token: notion}
+  - {name: Instawork, ats: greenhouse, token: instawork}
+newsletters:
+  - {name: "job hunting sux (Jordan Mazer)", sub: jordanmazer}
+  - {name: "Ali Rohde Jobs", sub: alirohdejobs}
+  - {name: "next play", sub: nextplayso}
+  - {name: "Nonlinear Techies", sub: careerhannah}
+  - {name: "Beyond Bay St.", sub: beyondbayst}
+  - {name: "Why You Should Join", sub: whyyoushouldjoin}
+  - {name: "Web Of Jobs", sub: webofjobs}
+
+# Fellowship/talent-network pages — content-hash watch, instant issue on change
+watch_pages:
+  - {name: "a16z speedrun alpha fellowship", url: "https://alpha.a16zspeedrun.com/"}
+  - {name: "a16z College Talent", url: "https://a16z.com/connect/college-talent/"}
+  - {name: "Neo Scholars", url: "https://neo.com/scholars"}
+  - {name: "Pear Fellows", url: "https://pear.vc/programs/dorm/fellows/"}
+  - {name: "Kleiner Perkins Fellows", url: "https://www.kleinerperkins.com/fellows/"}
+  - {name: "GC talent network", url: "https://jobs.generalcatalyst.com/talent-network"}
+
+  # IC / cleared agencies, added 2026-08-08. Deliberately watch_pages, not bespoke fetchers:
+  # none of these publishes an API, they post to their own HTML with short hard windows
+  # (NGA's Summer 2026 window was ~4 days). USAJOBS already covers the API-addressable
+  # federal surface and is polled separately. All require US citizenship + clearance.
+  - {name: CIA student programs, url: 'https://www.cia.gov/careers/student-programs/'}
+  - {name: NSA student programs, url: 'https://www.intelligencecareers.gov/nsa'}
+  - {name: NGA student opportunities, url: 'https://www.nga.mil/careers/Student_Opportunities.html'}
+  - {name: DIA careers/internships, url: 'https://www.dia.mil/Careers-Internships/'}
+  - {name: FBI Honors Internship, url: 'https://www.fbijobs.gov/students'}
+  - {name: ODNI student opportunities, url: 'https://www.dni.gov/index.php/careers/student-opportunities'}
+github_repos:
+  - zapplyjobs/Internships-2027
+  - SimplifyJobs/Summer2027-Internships
+  - SimplifyJobs/Summer2026-Internships
+  - vanshb03/Summer2027-Internships
+  - vanshb03/Summer2026-Internships
+  - speedyapply/2027-AI-College-Jobs
+  - speedyapply/2026-AI-College-Jobs
+  - jobright-ai/2027-Product-Management-Internship
+  - jobright-ai/2026-Product-Management-Internship
+  - jobright-ai/2027-Business-Analyst-Internship
+  - jobright-ai/2026-Business-Analyst-Internship
+  - jobright-ai/2027-Consultant-Internship
+  - jobright-ai/2026-Consultant-Internship
+  - jobright-ai/2027-Sales-Internship
+  - jobright-ai/2026-Sales-Internship
+  - jobright-ai/2027-Marketing-Internship
+  - jobright-ai/2026-Marketing-Internship
+  - jobright-ai/2027-Public-Sector-Internship
+  - jobright-ai/2026-Public-Sector-Internship
+  - jobright-ai/2027-Data-Analysis-Internship
+  - jobright-ai/2026-Data-Analysis-Internship
+  # Added 2026-08-08. zshah101 polls ~4,285 job-board endpoints across 12 ATS platforms every
+  # 30 min — ~36x the direct-feed count and the main way the walled companies (Google,
+  # Microsoft, LinkedIn, Atlassian, Figma) become reachable at all. zapplyjobs is the only
+  # list that explicitly covers BUSINESS roles, i.e. 6 of the 7 families. sndsh404 carries
+  # off-cycle terms; LuisaE feeds the pre-network calendar rather than the apply list.
+  - zshah101/Automated-List-Of-Summer-2027-and-Fall-2026-Tech-Internships
+  - zapplyjobs/Internships-2027
+  - sndsh404/summer-2027-internships
+  - LuisaE/opportunities
+  - sharunkumar/Summer-Internships

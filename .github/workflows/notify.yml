@@ -1,0 +1,38 @@
+name: notify
+# When the local digest pushes a file into data/pending/, create the issue AS THE BOT
+# so GitHub emails the operator (it won't email him for issues he creates himself).
+on:
+  push:
+    paths: ["data/pending/**"]
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: notify
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Turn pending digests into issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          shopt -s nullglob
+          created=0
+          for f in data/pending/*.md; do
+            title=$(head -1 "$f" | sed 's/^TITLE://')
+            tail -n +2 "$f" > /tmp/body.md
+            gh issue create --title "$title" --label digest --body-file /tmp/body.md && created=$((created+1))
+            rm "$f"
+          done
+          echo "created=$created"
+          if [ "$created" -gt 0 ]; then
+            git config user.name "radar-bot"
+            git config user.email "radar@users.noreply.github.com"
+            git add -A data/pending
+            git commit -m "clear pending [skip ci]" || true
+            git pull --rebase -X ours && git push
+          fi

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.internship-nightly</string>
+  <key>ProgramArguments</key>
+  <array><string>/Library/Frameworks/Python.framework/Versions/3.11/bin/python3</string>
+         <string>-m</string><string>radar.nightly</string></array>
+  <key>WorkingDirectory</key><string>~/.internship-radar</string>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>10</integer></dict>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>$HOME/.local/bin:$HOME/.composio:/usr/local/bin:/usr/bin:/bin</string>
+    <key>SSL_CERT_FILE</key><string>/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/certifi/cacert.pem</string>
+    <key>IR_BACKFILL_LIMIT</key><string>150</string></dict>
+  <key>StandardOutPath</key><string>/tmp/internship-nightly.log</string>
+  <key>StandardErrorPath</key><string>/tmp/internship-nightly.log</string>
+</dict>
+</plist>
