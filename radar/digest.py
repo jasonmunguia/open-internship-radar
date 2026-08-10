@@ -225,10 +225,18 @@ def _llm_available(timeout=45):
 
 
 def _sent_today():
-    """Guard so the hourly retries cannot produce a second digest once one has gone out."""
+    """Guard so the hourly retries cannot produce a second digest once one has gone out.
+
+    last_digest is an EPOCH INT (report_local_health writes int(time.time())), but this
+    guard compared its first ten DIGITS to an ISO date string — never equal, so the guard
+    never fired and every awake hourly retry re-sent the full digest (five landed on
+    2026-08-09 before anyone noticed; the defer gates had been masking it on mornings the
+    laptop slept). Both encodings are now accepted; epoch is what production writes."""
     try:
         with open(os.path.join(REPO_DIR, "data", "digest_heartbeat.json")) as fh:
             last = json.load(fh).get("last_digest", "")
+        if str(last).isdigit():
+            return date.fromtimestamp(int(last)) == date.today()
         return str(last)[:10] == date.today().isoformat()
     except Exception:
         return False
