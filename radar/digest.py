@@ -190,13 +190,24 @@ def report_local_health(status, sent):
         print(f"[warn] could not publish local heartbeat: {ex}")
 
 def _mark_deferred(reason):
-    """Record WHY we deferred so the dead-man's-switch tells waiting apart from broken."""
+    """Record WHY we deferred so the dead-man's-switch tells waiting apart from broken.
+
+    COMMITTED AND PUSHED, not just written: sync_repo() snaps this clone to origin/main
+    at the start of every retry, so a local-only record was destroyed before anything
+    could read it — observed 2026-08-09, when a real outage deferral left
+    deferred_reason None an hour later and the watchdog had nothing to distinguish
+    "waiting" from "broken"."""
     try:
         hb = os.path.join(REPO_DIR, "data", "digest_heartbeat.json")
         cur = json.load(open(hb)) if os.path.exists(hb) else {}
         cur["deferred_at"] = datetime.now().isoformat(timespec="seconds")
         cur["deferred_reason"] = reason
         json.dump(cur, open(hb, "w"), indent=1)
+        sh(f"git -C {REPO_DIR} add data/digest_heartbeat.json")
+        sh(f'git -C {REPO_DIR} -c user.name=radar-local -c user.email=radar@local '
+           f'commit -q -m "digest deferred [skip ci]"')
+        sh(f"git -C {REPO_DIR} pull --rebase -X ours -q")
+        sh(f"git -C {REPO_DIR} push -q")
     except Exception:
         pass
 

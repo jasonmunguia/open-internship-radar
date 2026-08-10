@@ -22,7 +22,34 @@ lead-gen pipeline. No model: the LLM only ever judges borderline rows downstream
 Rotation matters because a single public SearXNG instance rate-limits or disappears without
 warning; treating one as reliable is how a discovery pass silently returns zero forever.
 """
-import re, time, urllib.parse
+import json, os, re, time, urllib.parse
+
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _known_urls(cap=150):
+    """URLs discovery has already returned, or the queue already holds. Fed to the model
+    as do-NOT-return, and enforced as a hard filter on output — so each night asks only
+    for what is NEW instead of re-verifying last night's finds (NEXT.md item 6's
+    cache-across-nights optimisation). Most recent lines win the prompt budget."""
+    urls = []
+    for name in ("discovered.jsonl", "queue.jsonl"):
+        p = os.path.join(_ROOT, "data", name)
+        if not os.path.exists(p):
+            continue
+        for line in open(p):
+            try:
+                u = json.loads(line).get("url")
+            except Exception:
+                continue
+            if u:
+                urls.append(u)
+    seen, out = set(), []
+    for u in reversed(urls):                     # newest lines last in file -> first here
+        if u not in seen:
+            seen.add(u)
+            out.append(u)
+    return set(urls), out[:cap]
 
 # Backends in reliability order. Observed 2026-08-09 on the first live run: priv.au 403 then
 # 429, searxng.site 403, search.bus-hit.me DNS failure — 3 of 4 dead in one night, and the pass
@@ -120,6 +147,12 @@ def discover(families=None, timeout=None, per_query=None):
 
     from radar.joints import run_joint
     fams = [f for f in (families or list(FAMILY_QUERIES)) if f in FAMILY_QUERIES]
+    known_set, known_recent = _known_urls()
+    known_block = ""
+    if known_recent:
+        known_block = ("\n\nALREADY KNOWN — do NOT return these URLs, or other listings of the "
+                       "same role at the same company. Only postings NEW relative to this list:\n"
+                       + "\n".join(known_recent))
     out, seen, failed = [], set(), []
     for fam in fams:
         wanted = f"- {fam}: " + "; ".join(FAMILY_QUERIES[fam])
@@ -134,7 +167,8 @@ def discover(families=None, timeout=None, per_query=None):
             "3. Prefer things unlikely to appear on aggregator lists.\n"
             "4. Return ONLY a JSON array, no prose: "
             "[{\"url\":\"...\",\"company\":\"...\",\"title\":\"...\",\"family\":\"...\"}]\n"
-            "5. An empty array is a correct answer. A fabricated URL is not.")
+            "5. An empty array is a correct answer. A fabricated URL is not."
+            f"{known_block}")
         try:
             r = run_joint("discovery", prompt, timeout=timeout)
             body = r.stdout
@@ -146,8 +180,10 @@ def discover(families=None, timeout=None, per_query=None):
             continue
         n = 0
         for x in rows if isinstance(rows, list) else []:
+            # known_set is the hard cross-night filter (the prompt list is advisory and
+            # capped); seen is the within-run cross-family dedupe
             if isinstance(x, dict) and str(x.get("url", "")).startswith("http") \
-                    and x["url"] not in seen:
+                    and x["url"] not in seen and x["url"] not in known_set:
                 seen.add(x["url"])
                 out.append({"url": x["url"], "company": x.get("company", ""),
                             "title": x.get("title", ""), "family": x.get("family", fam),
