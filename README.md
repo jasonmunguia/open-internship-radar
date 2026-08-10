@@ -1,6 +1,6 @@
 # open-internship-radar
 
-An always-on job radar you run yourself. It polls ~165 sources every two hours, scores what it
+An always-on job radar you run yourself. It polls ~164 sources every two hours, scores what it
 finds against role families and company caliber, and emails you three things: **what opens soon**
 (so you can network before the posting exists), **what is open now** (as a queue you work to zero,
 not a feed you skim), and **anything urgent, within the hour**.
@@ -61,7 +61,7 @@ best of the three — so a well-funded 40-person startup with no audience still 
 ```
 GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
 ├─ 120 direct ATS APIs                      ├─ 07:20 digest, retried hourly to 18:20
-├─ 26 community job-list repos              │   └─ defers rather than sending a worse email
+├─ 25 community job-list repos              │   └─ defers rather than sending a worse email
 ├─ VC portfolio boards                      └─ 02:10 deep pass
 ├─ watch pages (no-API employers)               ├─ funding history
 ├─ SEC funding filings                          ├─ company tier backfill (scraper)
@@ -90,7 +90,7 @@ Follow [`SETUP.md`](SETUP.md). The short version:
 6. Install the launchd/cron jobs from `docs/`
 7. Optional: deploy `api/a.js` to Vercel for tap-to-clear links
 
-**Do the calibration run before going live.** Score ~30 organisations you already have an opinion
+**Do the calibration run before going live.** Score ~20 organisations you already have an opinion
 about and check the bands match your instinct. Twenty minutes, and it is the highest-value step in
 the whole setup — untuned thresholds either flood you or hide everything.
 

@@ -51,7 +51,7 @@ JOINTS = {
         "contract": "may revise dates with a cited evidence URL; may not invent "
                     "programs; malformed output is a no-op, never a partial write",
     },
-    # Not in the NEXT.md sketch — found while building this registry, which is the point.
+    # Not in the original four-joint sketch — found while building this registry, which is the point.
     "source_heal": {
         "model": "sonnet", "timeout": 900,
         "argv_extra": ["--permission-mode", "acceptEdits"],

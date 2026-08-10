@@ -16,8 +16,8 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 def _eligibility_facts():
     """The operator's hard facts, read from config/profile.yaml (eligibility_facts) at
     call time — NEVER hardcoded here. radar/*.py must not carry a name, class year, or
-    preference (the ARCHITECTURE.md boundary); a 2026-08-10 cold audit caught this
-    module violating that with a baked-in "class of 2028" block. A missing config block
+    preference (the config-not-code boundary in METHODOLOGY §5); a cold audit caught this
+    module violating that with a baked-in class-year block. A missing config block
     raises loudly: judging with unknown facts is worse than not judging, and the raise
     flows into the batch-failure counter, so the digest DEFERS instead of sending."""
     import yaml

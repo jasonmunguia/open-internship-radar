@@ -260,7 +260,7 @@ The architecture is not about internships. To retarget it:
    might exclude junior ones, or require a location, or a clearance.
 3. **Repoint the sources.** The ATS probing method works for any employer set. VC boards work for
    any startup search. Watch pages work for anything with no API.
-4. **Re-tune the tier thresholds** against ~30 organisations you already have an opinion about,
+4. **Re-tune the tier thresholds** against ~20 organisations you already have an opinion about,
    *before* going live. If a company you consider marginal lands top-band, your thresholds are
    wrong. This calibration run takes twenty minutes and is the highest-value step in setup.
 5. **Keep the joints.** Re-rank, resolution, discovery, and adjudication are domain-independent.

@@ -1,6 +1,6 @@
 """Morning digest — runs LOCALLY on the operator's Mac at 7:20am via launchd.
 Sends up to THREE emails — SMTP (tools/mailer.py) primary, Composio fallback:
-  #1 NETWORKING HEADS-UP: programs opening within 14 days (only newly-entered ones) -> pre-warm referrals.
+  #1 NETWORKING HEADS-UP: programs opening within 14 days (nags daily until tapped done) -> pre-warm referrals.
   #2 DAILY APPLY LIST: roles open <=14 days, color-coded by industry, AI eligibility-filtered.
   #3 BURNING/just-dropped: handled in real time by the cloud poller as GitHub-issue emails (0-token) — not here.
 """
@@ -69,9 +69,9 @@ def send_email(subject, body_html):
     """Clean-subject HTML email into the operator's inbox — no '[owner/repo]' prefix, full color.
 
     Composio's active Gmail connection drifts across his accounts, so branch on it:
-      * active IS the UCLA mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
+      * active IS the school mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
         (Plain SEND would self-bury in Sent, since example.edu and g.example.edu are one mailbox.)
-      * active is any other account -> SEND from there to UCLA (different sender = normal inbox arrival).
+      * active is any other account -> SEND from there to school (different sender = normal inbox arrival).
     Either branch yields a clean subject + full HTML. Falls back to the GitHub-issue relay only if
     Composio fails outright, so a delivery outage still reaches him (just with the botty prefix)."""
     if DRY:

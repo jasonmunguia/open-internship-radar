@@ -1,4 +1,6 @@
-"""The scrub is enforced, not remembered.
+"""The scrub is enforced, not remembered. (Hygiene, not anonymity: the repo is published
+under the author's own account, so commit metadata names them regardless — this guard
+keeps identity out of PROSE and CODE, where ports have twice reintroduced it.)
 
 This public repo is the identity-scrubbed twin of a private deployment. Ports from the
 private repo have TWICE reintroduced the author's identity through fallback literals and
@@ -21,6 +23,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _TOKENS = re.compile("|".join([
     "jason" + "munguia", "munguiaj" + "2017", "g\\." + "ucla\\.edu", "ucla\\.edu",
     "jasonm@" + "synphony", "synphony\\.co", "schematic\\.so", "oriane\\.ai",
+    "\\b" + "UCLA" + "\\b", "class of " + "2028",
 ]), re.I)
 
 _SHIP_EXT = (".py", ".md", ".sh", ".js", ".json", ".yaml", ".yml", ".example", ".txt")

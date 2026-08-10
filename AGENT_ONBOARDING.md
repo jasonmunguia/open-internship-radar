@@ -56,7 +56,9 @@ answer lives in their head and nowhere else. Ask EXACTLY these, in this order:
 3. **"Name ~10 companies you'd be thrilled by and ~10 you wouldn't bother with."** → the
    calibration set. Do NOT ask for thresholds — derive them and show the result.
 4. **"Where should email arrive, and which account should send it?"** → delivery. NEVER
-   the same address for both — a self-send files under Sent and is never seen.
+   the same address for both — a self-send files under Sent and is never seen. In the same
+   breath: **"which email domains belong to your employer(s)?"** → work_domains, the guard
+   that refuses to originate job-search mail from a work mailbox.
 
 **Calibration is step one, not an appendix.** Score their ~20 companies with the real
 tiering code, show the table, ask "does this match your instinct?", adjust bands/overrides
