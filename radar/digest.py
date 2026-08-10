@@ -1,7 +1,7 @@
 """Morning digest — runs LOCALLY on the operator's Mac at 7:20am via launchd.
 Sends up to THREE emails via Composio (g.example.edu -> example.edu):
   #1 NETWORKING HEADS-UP: programs opening within 14 days (only newly-entered ones) -> pre-warm referrals.
-  #2 DAILY APPLY LIST: roles open <=14 days, color-coded by industry, AI re-ranked.
+  #2 DAILY APPLY LIST: roles open <=14 days, color-coded by industry, AI eligibility-filtered.
   #3 BURNING/just-dropped: handled in real time by the cloud poller as GitHub-issue emails (0-token) — not here.
 """
 import json, os, subprocess, sys, time
@@ -36,7 +36,7 @@ from email.message import EmailMessage
 
 # Named channel in ~/.claude/tools/mailer.py (app password in macOS Keychain).
 # Personal account on purpose: never originate a job search from an employer mailbox,
-# and a different sender means it lands in the your university INBOX instead of burying itself in Sent.
+# and a different sender means it lands in the school INBOX instead of burying itself in Sent.
 
 # Employer mailboxes — never originate a job-search digest from these (their admins can read Sent).
 
@@ -66,12 +66,12 @@ def _raw_message(subject, body_html, frm, to):
     return base64.urlsafe_b64encode(m.as_bytes()).decode()
 
 def send_email(subject, body_html):
-    """Clean-subject HTML email into the operator's your university inbox — no '[owner/repo]' prefix, full color.
+    """Clean-subject HTML email into the operator's school inbox — no '[owner/repo]' prefix, full color.
 
     Composio's active Gmail connection drifts across his accounts, so branch on it:
-      * active IS the your university mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
+      * active IS the school mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
         (Plain SEND would self-bury in Sent, since example.edu and g.example.edu are one mailbox.)
-      * active is any other account -> SEND from there to your university (different sender = normal inbox arrival).
+      * active is any other account -> SEND from there to the school inbox (different sender = normal inbox arrival).
     Either branch yields a clean subject + full HTML. Falls back to the GitHub-issue relay only if
     Composio fails outright, so a delivery outage still reaches him (just with the botty prefix)."""
     if DRY:
@@ -212,17 +212,13 @@ def _network_up(host="api.github.com"):
         return False
 
 
-def _rerank_available(timeout=45):
-    """ACTUALLY invoke the CLI. The previous version returned shutil.which("claude") is not
-    None -- true whenever the binary is on disk, i.e. always -- so the defer guard never fired
-    once and degraded digests shipped for days. A capability check must exercise the
-    capability, not assert its existence."""
-    import subprocess
+def _llm_available(timeout=45):
+    """Capability probe — delegates to radar/joints.py, which ACTUALLY invokes the CLI.
+    (The lesson lives there: a check that only asserted the binary existed let degraded
+    digests ship for days. Exercise the capability, don't assert its existence.)"""
     try:
-        from radar.rerank import rerank            # noqa: F401
-        r = subprocess.run(["claude", "-p", "Reply with exactly: OK"],
-                           capture_output=True, text=True, timeout=timeout)
-        return "OK" in (r.stdout or "")
+        from radar.joints import llm_available
+        return llm_available(timeout)
     except Exception as ex:
         print(f"[defer] claude probe failed: {type(ex).__name__}")
         return False
@@ -265,21 +261,21 @@ def main():
     # borderline calls get a semantic second opinion before anything is hidden. Updates scores in place.
     if not DRY:
         try:
-            from radar.rerank import rerank, last_run_quality, reset_quality
+            from radar.eligibility import filter_ineligible, last_run_quality, reset_quality
             new_drops = [r for r in allrows if r.get("ts", 0) > since and r.get("score", 0) >= 40
                          and r.get("cluster") != "newsletter"]   # gov included (T1 target)
             reset_quality()
-            rerank(new_drops)
+            filter_ineligible(new_drops)
             _ok_b, _bad_b = last_run_quality()
             # "Is it available" and "did it work" are different questions. Overnight the probe
             # passed and then every batch timed out at 120s, so keyword-only scores shipped --
             # the exact degradation this logic exists to prevent. Judge the OUTPUT, not the tool.
             if _bad_b and _bad_b >= _ok_b and datetime.now().hour < 18:
-                print(f"[defer] re-rank degraded ({_ok_b} ok / {_bad_b} failed) — not sending")
-                _mark_deferred(f"re-rank degraded: {_ok_b} ok / {_bad_b} failed batches")
+                print(f"[defer] eligibility filter degraded ({_ok_b} ok / {_bad_b} failed) — not sending")
+                _mark_deferred(f"eligibility filter degraded: {_ok_b} ok / {_bad_b} failed batches")
                 return
         except Exception as ex:
-            print(f"[warn] rescue rerank unavailable: {ex}")
+            print(f"[warn] rescue eligibility filter unavailable: {ex}")
 
     # STANDING apply list: every role currently open <=fresh_days, fit >=55, deduped by company+title.
     display_floor = 55
@@ -309,11 +305,43 @@ def main():
     _shown = qs.mark_shown(roles)
     _relay = RELAY_BASE                                # unset -> raw links, never dead links
 
-    # ---- semantic re-rank (local Claude, no API key) ----
+    # Re-rank what we are ABOUT TO DISPLAY, not only what is new. The rescue pass above is
+    # incremental (ts > since), so on any queue with history the backlog never meets the model
+    # and the email shows rows with no reasoning at all — verified: 117 displayed rows, 0
+    # reasons. Bounded to the top slice so a large queue cannot blow the digest's time budget.
+    if not DRY:
+        try:
+            from radar.eligibility import filter_ineligible as _fi, last_run_quality as _lq, reset_quality as _rq
+            stale = [r for r in roles if not r.get("eligibility_note")][:40]
+            if stale:
+                # batch_size 10, not 20: a 20-row batch still exceeded 300s on the small model
+                # (observed 1 of 2 batches failing), and a failed batch means those rows show
+                # with no reasoning at all. Smaller batches fail less and fail cheaper.
+                _rq(); _fi(stale, band=(0, 100), batch_size=10, timeout=900)
+                _o, _b = _lq()
+                print(f"[eligibility] display pass: {len(stale)} rows, {_o} ok / {_b} failed")
+                if _b and _b >= _o and datetime.now().hour < 18:
+                    # Same rule as the rescue pass. Rows reaching the email with no reasoning
+                    # is the degradation, and it was ungated here.
+                    print("[defer] display eligibility filter degraded — not sending; will retry")
+                    _mark_deferred(f"display eligibility filter degraded: {_o} ok / {_b} failed")
+                    return
+        except Exception as ex:
+            print(f"[warn] display eligibility filter unavailable: {ex}")
+        # Drop ONLY what the model flagged as impossible to apply to. Re-applying the score
+        # floor here would let the model silently delete qualifying jobs — which is what it was
+        # doing when it graded "fit + interest + career value" instead of eligibility.
+        _cut = [r for r in roles if r.get("ineligible")]
+        roles = [r for r in roles if not r.get("ineligible")]
+        if _cut:
+            print("[eligibility] removed as ineligible: " +
+                  "; ".join(f"{r.get('company','?')} — {r.get('eligibility_note','')}" for r in _cut))
+
+    # ---- sort: freshest postings first ----
     roles.sort(key=lambda r: (str(r.get("posted_at") or "0000"), r.get("ts", 0), r.get("score", 0)), reverse=True)
 
     # ---- DEFER, DON'T DEGRADE (2026-08-08 per the operator) ----
-    # A 10/10 email at 9am beats a 7/10 at 7:20. If the local Claude re-rank cannot run —
+    # A 10/10 email at 9am beats a 7/10 at 7:20. If the local Claude eligibility filter cannot run —
     # laptop asleep, CLI missing, session dead — do NOT send a rule-scored-only digest.
     # Exit quietly; launchd retries hourly and fires the moment the machine is usable.
     # Hard backstop at 18:00: a late good email beats a bad one, but NO email beats both.
@@ -324,12 +352,12 @@ def main():
         print("[defer] no network (likely just woke) — not sending; will retry")
         _mark_deferred("no network at wake")
         return
-    if not DRY and not _rerank_available() and datetime.now().hour < 18:
+    if not DRY and not _llm_available() and datetime.now().hour < 18:
         # Record the deferral so the dead-man's-switch can tell "waiting for a usable machine"
         # apart from "the digest is broken". Without this, every deferred morning would page
         # the operator with a false stale-digest alarm and the alert would stop meaning anything.
-        _mark_deferred("local Claude re-rank unavailable")
-        print("[defer] re-rank unavailable and it is before 18:00 — not sending; will retry")
+        _mark_deferred("local Claude eligibility filter unavailable")
+        print("[defer] LLM unavailable and it is before 18:00 — not sending; will retry")
         return
 
     sent = []
@@ -397,13 +425,13 @@ def main():
             h.append(f"<tr><td colspan=6 style='padding:15px 6px 5px;font-weight:700;"
                      f"border-bottom:1px solid #ddd'>{bname} ({len(brows)})</td></tr>")
             for r in brows:
-                note = md(r.get("rerank_why") or r.get("funding") or "")[:110]
+                note = md(r.get("eligibility_note") or r.get("funding") or "")[:180]   # 20-word reasons need the room
                 posted = r.get("posted_at") or datetime.fromtimestamp(r.get("ts", 0)).strftime("%m-%d") + "~"
                 star = "⭐ " if r.get("_new") else ""
                 nd = qs.days_shown(r, _shown)
                 # Sitting-here-N-days pressure. Silence would let a role rot quietly; this is
                 # what replaces the old 14-day auto-expiry.
-                age = (f"<span style='color:#b45309;font-size:11px'> · day {nd}</span>" if nd >= 2 else "")
+                age = (f"<span style='color:#b45309;font-size:11px'> · day {nd}</span>" if nd >= 1 else "")
                 link = qs.relay(r.get("url", ""), r, _relay)
                 h.append("<tr style='border-bottom:1px solid #eee'>"
                          f"<td>{badge(r.get('industry','startup_other'))}</td>"

@@ -134,10 +134,11 @@ def apply_fix(name, new_ats, new_token):
 
 
 def escalate(name, ats, token, err):
-    """Last resort: Claude Code diagnoses and patches it, headlessly."""
-    claude = os.path.expanduser("~/.local/bin/claude")
-    if not os.path.exists(claude):
-        claude = "claude"
+    """Last resort: Claude Code diagnoses and patches it, headlessly.
+
+    Registered as the "source_heal" joint in radar/joints.py — it was the fifth model
+    call, missing from every prose inventory until the registry was built."""
+    from radar.joints import run_joint
     prompt = (
         f"The internship-radar job source '{name}' has failed {DARK_STREAK}+ consecutive polls and "
         f"automated repair could not fix it.\n\n"
@@ -151,8 +152,7 @@ def escalate(name, ats, token, err):
         f"refactor anything else; do not commit (the caller commits)."
     )
     try:
-        r = subprocess.run([claude, "-p", prompt, "--permission-mode", "acceptEdits"],
-                           cwd=ROOT, capture_output=True, text=True, timeout=900)
+        r = run_joint("source_heal", prompt, cwd=ROOT)
         return r.returncode == 0, (r.stdout or r.stderr or "")[-500:]
     except Exception as ex:
         return False, str(ex)[:300]

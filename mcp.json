@@ -1,0 +1,10 @@
+{
+  "_comment": "MCP servers this system can use. NOTHING here is required: primary email is SMTP via tools/mailer.py (Keychain app password), which works headlessly from launchd. MCP is the in-chat fallback path only. If you use Claude Code, add servers with `claude mcp add`; this file documents what to add and why.",
+  "servers": {
+    "gmail": {
+      "_load_bearing_for": "send_email() fallback #2 in radar/digest.py (Composio GMAIL_* tools). Route by EXPLICIT account: the unspecified default is often a work mailbox, and the work-domain guard will refuse to send the digest from one.",
+      "_how": "composio login && composio link gmail  (or any Gmail MCP server; the digest shells out to `composio execute`, so the Composio CLI specifically is what the fallback expects)",
+      "_optional": true
+    }
+  }
+}

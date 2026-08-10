@@ -45,6 +45,30 @@ def refresh_funded():
 def pid(p):
     return hashlib.sha1(f"{p['company']}|{p['title']}|{p['url']}".lower().encode()).hexdigest()[:16]
 
+def discovered_postings(path=None):
+    """Rows found by the nightly model-first discovery joint (radar/discover.py) re-enter
+    the pipeline HERE — same scoring, same family+tier gates, same seen-dedupe (pid) as
+    any polled board. Discovery widens the funnel; it never bypasses the filters.
+
+    Always logs its count when the file exists, INCLUDING zero: a dead ingest must look
+    different from an empty one, or discovery can die silently the way the scraped v1 did
+    (it reported success while returning nothing, twice, for different reasons)."""
+    path = path or os.path.join(ROOT, "data", "discovered.jsonl")
+    if not os.path.exists(path):
+        return []
+    out = []
+    for line in open(path):
+        try:
+            d = json.loads(line)
+        except Exception:
+            continue
+        if str(d.get("url", "")).startswith("http") and d.get("title"):
+            out.append({"company": d.get("company", ""), "title": d.get("title", ""),
+                        "location": d.get("location", ""), "url": d["url"],
+                        "source": "discovery"})
+    print(f"[discovery] ingested {len(out)} rows from data/discovered.jsonl")
+    return out
+
 def send_alert_email(subject, body_md):
     """Burning alert as a real email from the operator's personal Gmail — clean subject, no
     '[owner/repo]' prefix. Creds come from repo secrets. Returns True if sent."""
@@ -103,7 +127,11 @@ def fit_brief_md(p, score, brief, intel=None):
     if brief.get("funding"):
         lines.append(f"**💰 Just raised:** {brief['funding']} — staffing up, apply now.")
     lines += ["",
-        f"**Lead with your `{brief['angle']}` angle — emphasize these bullets:** {brief['angle_pitch']}"]
+        # angle_pitch exists in the brief ONLY when `angles` is enabled in profile.yaml
+        # (absent-means-off, no flag). The .get() guard is the correct consumer pattern:
+        # render only if present. An unguarded brief['angle_pitch'] would (rightly) KeyError.
+        (f"**Lead with your `{brief['angle']}` angle:** {brief['angle_pitch']}"
+         if brief.get("angle_pitch") else "")]
     if brief["matched_keywords"]:
         lines.append(f"**Hooks to echo in app:** {', '.join(brief['matched_keywords'])}")
     lines += ["",
@@ -125,6 +153,7 @@ def main():
     postings, errors, counts = fetch_all(sources)
     for e in errors:
         print(f"[warn] {e}", file=sys.stderr)
+    postings += discovered_postings()
 
     refresh_funded()          # SEC Form D $60M+ radar, once/day
     funded = load_funded()    # rolling 120-day watchlist -> scorer promotes these companies

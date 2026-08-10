@@ -11,6 +11,11 @@ deterministic parts run free in GitHub Actions whether your laptop is open or no
 **Setup: 30–60 minutes.** Most of that is deciding what you actually want, which is the part worth
 your time.
 
+**Have a coding agent? Paste it this single instruction and it can do the rest:**
+> Read `METHODOLOGY.md`, then `CLAUDE.md`, then `AGENT_ONBOARDING.md`, then run
+> `bash install.sh` and bring me online per the onboarding doc. Treat unedited example
+> config as unfinished setup, and end with a real run I can see.
+
 ---
 
 ## Why this exists
@@ -66,8 +71,8 @@ GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
 ```
 
 **Deterministic spine, LLM at the joints.** Fetching, parsing, scoring, and delivery are plain
-code — same input, same output, debuggable, free. A model is invoked at exactly four points where
-the alternative would be a heuristic that is wrong. Full reasoning in `METHODOLOGY.md` §2.
+code — same input, same output, debuggable, free. A model is invoked at exactly five registered joints (`radar/joints.py` — enforced by
+`tests/test_joints.py`) where the alternative would be a heuristic that is wrong. Full reasoning in `METHODOLOGY.md` §2.
 
 ---
 
@@ -75,7 +80,8 @@ the alternative would be a heuristic that is wrong. Full reasoning in `METHODOLO
 
 Follow [`SETUP.md`](SETUP.md). The short version:
 
-1. Clone; `pip install -r requirements.txt`
+1. Clone; `bash install.sh` (installs requirements + Scrapling, ships the skills and
+   the mailer, verifies every dependency in `DEPENDENCIES.md`)
 2. `cp config/person.example.yaml config/person.yaml` — who you are, where mail goes
 3. `cp config/profile.example.yaml config/profile.yaml` — **the file that matters.** Role
    families, eligibility gates, tier thresholds
@@ -107,6 +113,8 @@ not are one person's patterns and thresholds for one market at one moment.
 | [`SETUP.md`](SETUP.md) | Step-by-step install |
 | [`TOOLS.md`](TOOLS.md) | Every tool, the job it does, the LLM joints, the failure modes |
 | [`CLAUDE.md`](CLAUDE.md) | Operating doctrine for a coding agent working in this repo |
+| [`AGENT_ONBOARDING.md`](AGENT_ONBOARDING.md) | How an agent brings a HUMAN online — the three jobs, the four questions |
+| [`DEPENDENCIES.md`](DEPENDENCIES.md) | Every external tool: capability, what it is load-bearing for, where to get it |
 
 ## Honesty about maturity
 

@@ -16,27 +16,56 @@ def _any(patterns, text):
 # and dropping on missing data would lose good postings.
 # Countries/regions are unambiguous -> they outrank everything.
 _FOREIGN_COUNTRY = [
-    r"\bcanada\b", r"\bCAN\b", r"\bunited kingdom\b", r"\bengland\b", r"\bscotland\b",
-    r"\bwales\b", r"\bireland\b", r"\bGBR\b", r"\bU\.?K\.?\b",
-    r"\bgermany\b", r"\bDEU\b", r"\bfrance\b", r"\bFRA\b", r"\bspain\b", r"\bESP\b",
-    r"\bitaly\b", r"\bITA\b", r"\bnetherlands\b", r"\bNLD\b", r"\bbelgium\b",
-    r"\bswitzerland\b", r"\bCHE\b", r"\bsweden\b", r"\bnorway\b", r"\bdenmark\b",
-    r"\bfinland\b", r"\bpoland\b", r"\bPOL\b", r"\bportugal\b", r"\baustria\b",
-    r"\bczech\b", r"\bromania\b", r"\bgreece\b", r"\bhungary\b", r"\bukraine\b",
-    r"\bbrazil\b", r"\bBRA\b", r"\bmexico\b", r"\bMEX\b", r"\bargentina\b", r"\bchile\b",
-    r"\bcolombia\b", r"\bperu\b", r"\bcosta rica\b", r"\bindia\b", r"\bIND\b",
-    r"\bchina\b", r"\bCHN\b", r"\bjapan\b", r"\bJPN\b", r"\bkorea\b", r"\bKOR\b",
-    r"\bsingapore\b", r"\bSGP\b", r"\bhong kong\b", r"\btaiwan\b", r"\bthailand\b",
-    r"\bvietnam\b", r"\bphilippines\b", r"\bindonesia\b", r"\bmalaysia\b",
-    r"\baustralia\b", r"\bAUS\b", r"\bnew zealand\b", r"\bisrael\b", r"\bISR\b",
-    r"\bunited arab emirates\b", r"\bUAE\b", r"\bqatar\b", r"\bsaudi\b", r"\bturkey\b",
-    r"\bturkiye\b", r"\begypt\b", r"\bmorocco\b", r"\bsouth africa\b", r"\bnigeria\b",
-    r"\bkenya\b", r"\bEMEA\b", r"\bAPAC\b", r"\bLATAM\b", r"\bEurope\b",
-]
-# Bare city names (no country given). Checked only AFTER a US signal is ruled out,
+    # Full country list, not the hand-typed partial one it replaced. The original omitted
+    # Estonia, Uzbekistan, Latvia, Lithuania, Serbia, Croatia, Bulgaria, Slovakia,
+    # Pakistan and Bangladesh among others, so postings there passed the US-only gate
+    # silently. Found 2026-08-09 when the LLM eligibility pass caught a Tallinn role and
+    # a Tashkent role the regex had waved through -- a model compensating for a
+    # deterministic bug is a signal to fix the deterministic layer, not to lean on it.
+    r"\bafghanistan\b", r"\balbania\b", r"\balgeria\b", r"\bandorra\b", r"\bangola\b", r"\bargentina\b",
+    r"\barmenia\b", r"\baustralia\b", r"\baustria\b", r"\bazerbaijan\b", r"\bbahamas\b", r"\bbahrain\b",
+    r"\bbangladesh\b", r"\bbarbados\b", r"\bbelarus\b", r"\bbelgium\b", r"\bbelize\b", r"\bbenin\b",
+    r"\bbhutan\b", r"\bbolivia\b", r"\bbosnia\b", r"\bbotswana\b", r"\bbrazil\b", r"\bbrunei\b",
+    r"\bbulgaria\b", r"\bburkina\b", r"\bburundi\b", r"\bcambodia\b", r"\bcameroon\b", r"\bcanada\b",
+    r"\bchile\b", r"\bchina\b", r"\bcolombia\b", r"\bcongo\b", r"\bcroatia\b",
+    r"\bcosta[ .-]?rica\b", r"\bcuba\b", r"\bcyprus\b", r"\bczechia\b", r"\bczech\b", r"\bdenmark\b", r"\bdjibouti\b",
+    r"\bdominican?\b", r"\becuador\b", r"\begypt\b", r"\bel[ .-]?salvador\b", r"\bestonia\b", r"\beswatini\b",
+    r"\bethiopia\b", r"\bfiji\b", r"\bfinland\b", r"\bfrance\b", r"\bgabon\b", r"\bgambia\b",
+    r"\bgermany\b", r"\bghana\b", r"\bgreece\b", r"\bgrenada\b", r"\bguatemala\b",
+    r"\bguyana\b", r"\bhaiti\b", r"\bhonduras\b", r"\bhungary\b", r"\biceland\b",
+    r"\bindia\b", r"\bindonesia\b", r"\biran\b", r"\biraq\b", r"\bireland\b", r"\bisrael\b",
+    r"\bitaly\b", r"\bjamaica\b", r"\bjapan\b", r"\bkazakhstan\b", r"\bkenya\b",
+    r"\bkosovo\b", r"\bkuwait\b", r"\bkyrgyzstan\b", r"\blaos\b", r"\blatvia\b", 
+    r"\blesotho\b", r"\bliberia\b", r"\blibya\b", r"\bliechtenstein\b", r"\blithuania\b", r"\bluxembourg\b",
+    r"\bmadagascar\b", r"\bmalawi\b", r"\bmalaysia\b", r"\bmaldives\b", r"\bmali\b", 
+    r"\bmauritania\b", r"\bmauritius\b", r"\bmoldova\b", r"\bmonaco\b", r"\bmongolia\b",
+    r"\bmontenegro\b", r"\bmorocco\b", r"\bmozambique\b", r"\bmyanmar\b", r"\bnamibia\b", r"\bnepal\b",
+    r"\bnetherlands\b", r"\bnew[ .-]?zealand\b", r"\bnicaragua\b", r"\bnigeria\b", r"\bnorth[ .-]?macedonia\b",
+    r"\bnorway\b", r"\boman\b", r"\bpakistan\b", r"\bpanama\b", r"\bpapua\b",
+    r"\bparaguay\b", r"\bphilippines\b", r"\bpoland\b", r"\bportugal\b", r"\bqatar\b",
+    r"\bromania\b", r"\brussia\b", r"\brwanda\b", r"\bsaudi\b", r"\bsenegal\b", r"\bserbia\b",
+    r"\bseychelles\b", r"\bsierra[ .-]?leone\b", r"\bsingapore\b", r"\bslovakia\b", r"\bslovenia\b", r"\bsomalia\b",
+    r"\bsouth[ .-]?africa\b", r"\bsouth[ .-]?korea\b", r"\bsouth[ .-]?sudan\b", r"\bspain\b", r"\bsri[ .-]?lanka\b", r"\bsudan\b",
+    r"\bsuriname\b", r"\bsweden\b", r"\bswitzerland\b", r"\bsyria\b", r"\btaiwan\b", r"\btajikistan\b",
+    r"\btanzania\b", r"\bthailand\b", r"\btogo\b", r"\btrinidad\b", r"\btunisia\b", r"\bturkey\b",
+    r"\bturkiye\b", r"\bturkmenistan\b", r"\buganda\b", r"\bukraine\b", r"\bunited[ .-]?arab[ .-]?emirates\b", r"\bunited[ .-]?kingdom\b",
+    r"\buruguay\b", r"\buzbekistan\b", r"\bvanuatu\b", r"\bvenezuela\b", r"\bvietnam\b", r"\byemen\b",
+    r"\bzambia\b", r"\bzimbabwe\b", r"\bengland\b", r"\bscotland\b", r"\bwales\b", r"\bnorthern[ .-]?ireland\b",
+    r"\bGBR\b", r"\bDEU\b", r"\bFRA\b", r"\bESP\b", r"\bITA\b", r"\bNLD\b", r"\bCHE\b", r"\bPOL\b", r"\bBRA\b", r"\bMEX\b", r"\bIND\b", r"\bCHN\b", r"\bJPN\b", r"\bKOR\b", r"\bSGP\b",
+    r"\bAUS\b", r"\bISR\b", r"\bUAE\b", r"\bCAN\b", r"\bEST\b", r"\bLVA\b", r"\bLTU\b", r"\bUZB\b", r"\bPAK\b", r"\bBGD\b", r"\bPHL\b", r"\bIDN\b", r"\bMYS\b", r"\bTHA\b", r"\bVNM\b",
+    r"\bZAF\b", r"\bNGA\b", r"\bKEN\b", r"\bEGY\b", r"\bTUR\b", r"\bARG\b", r"\bCHL\b", r"\bCOL\b", r"\bPER\b", r"\bNZL\b", r"\bIRL\b", r"\bSWE\b", r"\bNOR\b", r"\bDNK\b", r"\bFIN\b",
+    r"\bEMEA\b", r"\bAPAC\b", r"\bLATAM\b", r"\bEurope\b", r"\bU\.?K\.?\b",
+]# Bare city names (no country given). Checked only AFTER a US signal is ruled out,
 # so "Milan, TN" stays a US role while a bare "Milano" does not. Prefixes, not whole
 # words, so native spellings match (Milano/Milan, Torino/Turin, Roma/Rome).
 _FOREIGN_CITY = [
+    # AMBIGUOUS: each of these is also a US state or town (Georgia; Lebanon PA; Jordan MN;
+    # Peru IN; Mexico MO; Palestine TX). They live here, NOT in _FOREIGN_COUNTRY, because this
+    # list is consulted only after an explicit US signal has been ruled out -- so "Georgia,
+    # United States" and "Mexico, MO" survive while a bare "Tbilisi, Georgia" does not.
+    r"\bgeorgia(?!,? ?(us|usa|united states|[A-Z]{2}\b))", r"\blebanon\b", r"\bjordan\b",
+    r"\bperu\b", r"\bmexico\b", r"\bpalestine\b", r"\bchad\b", r"\bniger\b",
+    r"\bguinea\b", r"\bmalta\b",
     r"\blondon\b", r"\bparis\b", r"\bberlin\b", r"\bmunich", r"\bm[üu]nchen",
     r"\bmadrid\b", r"\bbarcelona\b", r"\bsevilla\b", r"\bvalencia\b",
     r"\bmilan", r"\brom[ae]\b", r"\btorino\b", r"\bturin\b", r"\bfirenze\b", r"\bnapoli\b",
@@ -58,13 +87,41 @@ _FOREIGN_CITY = [
     r"\bcasablanca\b", r"\bcairo\b", r"\bnairobi\b", r"\blagos\b", r"\bjohannesburg\b",
     r"\bcape town\b", r"\bmanila\b", r"\bjakarta\b", r"\bbangkok\b", r"\bkuala lumpur\b",
     r"\bho chi minh\b", r"\bhanoi\b", r"\bistanbul\b", r"\bnovara\b", r"\bpiedmont\b",
+    # Bare-city batch 2 (2026-08-09, NEXT.md item 5): capitals/hubs with no notable US
+    # namesake. Deliberately ABSENT because a real US city owns the bare name: St
+    # Petersburg (FL), Victoria (TX), Wellington (FL) — those residuals belong to the
+    # eligibility joint. Moscow ID / Glasgow KY / Belfast ME are small enough that the US
+    # ones always ship with a state, so the bare name means the foreign city.
+    r"\btashkent\b", r"\bankara\b", r"\baccra\b", r"\briyadh\b", r"\bjeddah\b", r"\bmanama\b",
+    r"\bhong kong\b", r"\bkarachi\b", r"\blahore\b", r"\bislamabad\b", r"\bdhaka\b",
+    r"\bcolombo\b", r"\bkathmandu\b", r"\bkyiv\b", r"\bkiev\b", r"\bmoscow\b", r"\bminsk\b",
+    r"\briga\b", r"\bvilnius\b", r"\btallinn\b", r"\bbelgrade\b", r"\bzagreb\b", r"\bsofia\b",
+    r"\bsarajevo\b", r"\bskopje\b", r"\btirana\b", r"\bbratislava\b", r"\bljubljana\b",
+    r"\bporto\b", r"\bbilbao\b", r"\blyon\b", r"\bmarseille\b", r"\btoulouse\b",
+    r"\bhamburg\b", r"\bfrankfurt\b", r"\bcologne\b", r"\bk[öo]ln\b", r"\bstuttgart\b",
+    r"\bd[üu]sseldorf\b", r"\bleipzig\b", r"\bdresden\b", r"\bantwerp\b", r"\bghent\b",
+    r"\beindhoven\b", r"\bthe hague\b", r"\butrecht\b", r"\bg[öo]teborg\b", r"\bgothenburg\b",
+    r"\bmalm[öo]\b", r"\baarhus\b", r"\bespoo\b", r"\btampere\b", r"\breykjavik\b",
+    r"\btunis\b", r"\balgiers\b", r"\baddis ababa\b", r"\bkampala\b", r"\bdar es salaam\b",
+    r"\bkigali\b", r"\bdakar\b", r"\babidjan\b", r"\bquito\b", r"\bcaracas\b",
+    r"\bmontevideo\b", r"\basunci[óo]n\b", r"\bla paz\b", r"\btegucigalpa\b", r"\bmanagua\b",
+    r"\bhavana\b", r"\bsanto domingo\b", r"\bedinburgh\b", r"\bglasgow\b", r"\bleeds\b",
+    r"\bcardiff\b", r"\bbelfast\b", r"\bquebec\b", r"\bmississauga\b", r"\bsaskatoon\b",
+    r"\bchristchurch\b", r"\badelaide\b", r"\bcanberra\b", r"\bhobart\b",
+    # Canadian province + NZ codes, comma-anchored AND end/comma-terminated so prose like
+    # "Chicago, on-site" cannot match: catches "Waterloo, ON", "Halifax, NS", "Victoria, BC".
+    r",\s*(on|bc|ab|sk|mb|ns|nb|qc|pe|nl|yt|nt|nu)(?=$|,)",
+    r",\s*nz(?=$|,)",
 ]
 _US_STATES = ("AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV "
               "NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC").split()
 _US = [r"\bunited states\b", r"\bU\.?S\.?A\b", r"\bUSA\b", r"\bUS\b(?=$|[,\s\)])",
        r"\bremote\s*[-–,(]?\s*(us|usa|united states)\b",
+       # NOTE: "georgia" is deliberately absent from this alternation -- it is both a US state and a
+       # country, and listing it here made "Tbilisi, Georgia" match as a positive US signal.
+       # Atlanta still passes via ", GA"; "Georgia, United States" via "united states".
        r"\b(california|texas|new york|florida|washington|massachusetts|illinois|virginia|"
-       r"colorado|georgia|arizona|ohio|michigan|oregon|nevada|utah|maryland|"
+       r"colorado|arizona|ohio|michigan|oregon|nevada|utah|maryland|"
        r"pennsylvania|minnesota|wisconsin|missouri|tennessee|indiana|alabama|"
        r"nebraska|connecticut|new jersey|north carolina|south carolina|new mexico|"
        r"oklahoma|kansas|iowa|arkansas|louisiana|kentucky|mississippi|idaho|montana|"
@@ -197,17 +254,21 @@ def score_posting(posting, profile, funded=None, tier_cache=None):
         return None, None
 
     score = min(round(best_weight + tier_score + bonus + offcycle_pts + fund_pts), 100)
-    # Briefs stay blind to the operator's history while angles are paused — he picks the resume.
-    angles_off = profile.get("angles_paused", False)
+    # Angles are OFF when `angles` is absent/empty in profile.yaml — there is no pause flag.
+    # While off, angle_pitch is NOT in the brief at all: a stale consumer that assumes the
+    # key raises KeyError instead of rendering blank text into an email (poll.py shipped a
+    # 'Lead with your `` angle:' line for a day when this was "" behind an angles_paused flag).
     angle_key = profile["clusters"][best_cluster]["angle"] if best_cluster else "founder"
     brief = {
         "cluster": best_cluster or ("recent-raise" if fund_hit else "unmatched-title"),
         "tier": tier_name,
         "angle": angle_key,
-        "angle_pitch": "" if angles_off else profile["angles"].get(angle_key, ""),
         "matched_keywords": [m.strip("\\b") for m in matched_bonus],
         "offcycle": offcycle,
     }
+    _angles = profile.get("angles") or {}
+    if _angles.get(angle_key):
+        brief["angle_pitch"] = _angles[angle_key]
     if fund_hit:
         brief["funding"] = f"raised ${fund_hit.get('amount',0)/1e6:.0f}M ({fund_hit.get('date','recent')})"
     brief["industry"] = classify_industry(company, posting.get("source", ""), profile)

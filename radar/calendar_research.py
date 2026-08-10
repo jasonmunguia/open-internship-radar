@@ -23,7 +23,7 @@ It may NOT invent programs, and every changed entry must carry an `evidence:` UR
 Output is validated and diffed before anything is written; a malformed response is a no-op,
 never a partial overwrite.
 """
-import json, os, subprocess, tempfile
+import json, os, tempfile
 from datetime import date
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,26 +53,31 @@ Return ONLY a YAML list, no prose, no code fences. Each item:
   program, company, expected_open (YYYY-MM-DD), confidence (high|medium|low|dead),
   cadence, terms, deadline_behavior, requirements, evidence
 
+{observed}
+
 CURRENT CALENDAR:
 {calendar}
 """
 
 
-def run(timeout=1800, model=None):
+def run(timeout=None, model=None):
     """Invoke the local Claude CLI to refresh the calendar. Returns a change report.
 
     Never partially writes: the response is parsed and validated in full, and only a
     structurally valid list replaces the file. A bad run leaves yesterday's calendar intact,
-    which is strictly better than a half-updated one."""
-    import yaml
-    current = open(CAL).read()
-    prompt = PROMPT.format(today=date.today().isoformat(), calendar=current)
+    which is strictly better than a half-updated one.
 
-    cmd = ["claude", "-p", prompt, "--permission-mode", "bypassPermissions"]
-    if model:
-        cmd += ["--model", model]
+    Model + timeout come from the JOINTS registry (radar/joints.py, "calendar")."""
+    import yaml
+
+    from radar.joints import run_joint
+    from radar.observed import evidence_block
+    current = open(CAL).read()
+    prompt = PROMPT.format(today=date.today().isoformat(), calendar=current,
+                           observed=evidence_block())
+
     try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout
+        out = run_joint("calendar", prompt, timeout=timeout, model=model).stdout
     except Exception as ex:
         return {"ok": False, "error": f"claude invocation failed: {ex}"}
 

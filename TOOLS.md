@@ -59,21 +59,31 @@ than racing a file SHA.
 
 **SEC EDGAR** via the `free-apis` skill — Form D filings, the funding tier signal.
 
-## LLM joints — the only four places a model is used
+## LLM joints — the five places a model is used, and the registry that enforces it
 
-Everything else is deterministic. If you swap models, these are the contracts to preserve.
+**`radar/joints.py` is the registry and the only door to the CLI** — every joint's model,
+timeout and contract lives there, and `tests/test_joints.py` fails if a model call appears
+anywhere else. (This section used to say "four"; building the registry on 2026-08-09
+surfaced a fifth the prose had missed — which is why the registry exists.)
 
-1. **Semantic re-rank** (`radar/rerank.py`) — every new drop scoring >= 40 gets a second
-   opinion before anything is hidden. Rule scoring is deliberately blunt; this catches its
-   borderline calls.
-2. **Slug resolution** (`radar/tiers.py`) — only after the deterministic chain fails: slug
-   guesses, then a search-engine lookup. A model is asked which LinkedIn company page is
-   really this company.
-3. **Title-variant discovery** (`data/dropped_unmatched.jsonl`) — titles dropped at T1/T2
-   companies are mined for real variants no pattern knows. It **proposes** patterns; it never
-   auto-adds them.
-4. **Name-collision adjudication** — when funding says serious and follower count says tiny,
-   both signals are distrusted and the case is handed over.
+1. **eligibility** (`radar/eligibility.py`, was `rerank`) — every new drop scoring >= 40
+   gets a second opinion before anything is hidden. May only remove the IMPOSSIBLE;
+   defaults to eligible; never expresses preference.
+2. **slug_resolve** (`radar/tiers.py`) — after slug guesses and a search-engine lookup
+   both fail, a model is asked which LinkedIn page is really this company. Every answer is
+   re-verified through the same gates as a guess; omission is correct, guessing is not.
+   (Name collisions — funding says serious, followers say tiny — feed this queue too.)
+3. **discovery** (`radar/discover.py`) — "what postings exist?" with real web search.
+   Only postings actually seen; never constructed URLs; empty array is a valid answer.
+4. **calendar** (`radar/calendar_research.py`) — refreshes release-date estimates; may
+   revise dates only with a cited evidence URL (and `radar/observed.py` feeds it the real
+   post dates the system has itself witnessed); malformed output is a no-op.
+5. **source_heal** (`radar/self_heal.py`) — a source dark 3+ polls after automated repair
+   failed: may edit only that source's entry in sources.yaml, must verify jobs return,
+   never commits.
+
+Title-variant mining from `data/dropped_unmatched.jsonl` PROPOSES patterns to a human; it
+never auto-adds them.
 
 ## Failure modes and what they look like
 

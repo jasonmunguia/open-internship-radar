@@ -1,6 +1,6 @@
 """Nightly deep pass — the work that needs a laptop, a model, and no hurry.
 
-the operator keeps his machine open, so the expensive judgment-heavy jobs run at 2am rather than
+the operator keeps their machine open, so the expensive judgment-heavy jobs run at 2am rather than
 competing with the 7:20am digest. Each stage is independently wrapped: a stage that fails
 must not prevent the ones after it, because a partial refresh beats no refresh.
 
@@ -72,6 +72,13 @@ def main():
                 fh.write(json.dumps(r) + "\n")
         return {"found": len(found)}
 
+    def observed():
+        # Deterministic: record queue rows that ARE calendared programs opening, so the
+        # calendar joint below gets ground truth, not just web estimates. Runs right
+        # before calendar_research on purpose — same-night evidence reaches the prompt.
+        from radar.observed import capture
+        return capture()
+
     def calendar():
         from radar.calendar_research import run
         return run()
@@ -80,7 +87,7 @@ def main():
     # grounds, not technical ones. Do not re-add it.
     for name, fn in [("funding", funding), ("tier_backfill", backfill),
                      ("slug_resolution", slugs), ("discovery", discovery),
-                     ("calendar_research", calendar)]:
+                     ("observed_opens", observed), ("calendar_research", calendar)]:
         _stage(name, fn, report)
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)

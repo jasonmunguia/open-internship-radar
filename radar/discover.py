@@ -52,16 +52,15 @@ FAMILY_QUERIES = {
 
 
 def _fetch(url_tpl, q):
-    from scrapling.fetchers import StealthyFetcher
+    from radar.fetch import validated_fetch
     url = url_tpl.format(q=urllib.parse.quote(q))
-    try:
-        p = StealthyFetcher.fetch(url, headless=True, network_idle=False, timeout=30000)
-        if p.status != 200:
-            return ""
-        # str(p.body) too: result URLs live in href attributes, not visible text
-        return p.get_all_text() + " " + str(p.body)
-    except Exception:
+    # allow_redirect_host: search endpoints bounce between their own hosts; we read result
+    # links from the page, we do not assert its identity.
+    p, ok, _why = validated_fetch(url, allow_redirect_host=True, timeout=30000)
+    if not ok:
         return ""
+    # str(p.body) too: result URLs live in href attributes, not visible text
+    return p.get_all_text() + " " + str(p.body)
 
 
 def discover_scraped(families=None, per_query=1):
@@ -103,13 +102,17 @@ def discover_scraped(families=None, per_query=1):
     return out
 
 
-def discover(families=None, timeout=900, per_query=None):
+def discover(families=None, timeout=None, per_query=None):
     """Ask a coding-agent CLI with web search to find postings no polled board carries.
 
     Returns [{url, family, company, title}]. Everything found re-enters the normal pipeline
-    and is scored, gated and deduped like any other row -- discovery widens the funnel, it
-    never bypasses the filters."""
-    import json as _json, subprocess
+    (poll.py ingests data/discovered.jsonl) and is scored, gated and deduped like any other
+    row -- discovery widens the funnel, it never bypasses the filters.
+
+    Model + timeout come from the JOINTS registry (radar/joints.py, "discovery")."""
+    import json as _json
+
+    from radar.joints import run_joint
     fams = families or list(FAMILY_QUERIES)
     wanted = "\n".join(f"- {f}: " + "; ".join(FAMILY_QUERIES[f]) for f in fams if f in FAMILY_QUERIES)
     prompt = (
@@ -125,8 +128,7 @@ def discover(families=None, timeout=900, per_query=None):
         "[{\"url\":\"...\",\"company\":\"...\",\"title\":\"...\",\"family\":\"...\"}]\n"
         "5. An empty array is a correct answer. A fabricated URL is not.")
     try:
-        r = subprocess.run(["claude", "-p", prompt, "--permission-mode", "bypassPermissions"],
-                           capture_output=True, text=True, timeout=timeout)
+        r = run_joint("discovery", prompt, timeout=timeout)
         body = r.stdout
         body = body.split("```")[1].lstrip("json").strip() if "```" in body else body.strip()
         rows = _json.loads(body[body.find("["):body.rfind("]") + 1])

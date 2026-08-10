@@ -11,8 +11,11 @@ identity:
 # brief. Leave paused unless you maintain one resume per family — otherwise every brief
 # gets framed by whichever single resume you happened to write first, which quietly biases
 # you toward roles that resume already fits.
-angles_paused: true
-angles: {}
+# Angles are OFF when `angles` is absent/empty — there is no pause flag. While off,
+# score.py emits NO angle_pitch key at all, so a stale consumer raises KeyError instead
+# of rendering blank text. To enable: uncomment and fill with your per-family one-liners.
+# angles:
+#   product: "your strongest product proof points, one line"
 
 
 # Cluster taxonomy: title/dept regex fragments -> weight + angle to lead with

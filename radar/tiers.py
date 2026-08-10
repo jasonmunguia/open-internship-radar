@@ -72,59 +72,23 @@ def slug_candidates(company):
     return out
 
 
-def _slug_of(url):
-    m = re.search(r"linkedin\.com/company/([^/?#]+)", str(url or ""))
-    return m.group(1).lower() if m else ""
-
-
-def _redirect_ok(final_url, requested_slug):
-    """LinkedIn 301s an unknown slug to whatever it thinks you meant, on any country host.
-    'uber' redirected to uk.linkedin.com/company/ubercreativedigitalagency — a UK creative
-    agency — which then passed a substring name check and tiered Uber at T3 on 5,984
-    followers. If the slug moved, the company we asked for is not the company we got."""
-    return _slug_of(final_url) in ("", requested_slug.lower())
-
-
-def _name_matches(page_title, company):
-    """Second gate, after the redirect check. Substring is too weak in both directions
-    ('uber' matches 'ubercreativedigitalagency'), so compare normalised names: the page name
-    must equal the requested name, or exceed it only by known corporate suffixes."""
-    if not page_title:
-        return False
-    page_name = page_title.split("|")[0]
-    norm = lambda t: [w for w in re.sub(r"[^a-z0-9 ]", " ", t.lower()).split() if w]
-    want, got = norm(company), norm(page_name)
-    if not want or not got:
-        return False
-    if got[:len(want)] != want:                       # must START with the requested name
-        return False
-    extra = set(got[len(want):]) - set(_SUFFIXES) - {"the", "group", "co", "company", "and"}
-    return not extra                                  # no unexplained extra words
-
-
 def scrape_linkedin(company, sleep=0.6):
     """(followers, employees, resolved_slug) or (None, None, None). Logged-out public page,
-    no auth, no credits. Scrapling handles the anti-bot layer."""
-    from scrapling.fetchers import StealthyFetcher
+    no auth, no credits. Scrapling handles the anti-bot layer.
+
+    Identity validation (redirect + name gates) lives in radar/fetch.py — the shared
+    validated_fetch that encodes "a 404 is safe; a wrong 200 is dangerous"."""
+    from radar.fetch import validated_fetch
     for slug in slug_candidates(company):
-        try:
-            p = StealthyFetcher.fetch(f"https://www.linkedin.com/company/{slug}/",
-                                      headless=True, network_idle=False, timeout=40000)
-            if p.status != 200:
-                continue
-            if not _redirect_ok(getattr(p, "url", ""), slug):
-                continue                        # LinkedIn sent us to a different company
+        p, ok, _why = validated_fetch(f"https://www.linkedin.com/company/{slug}/",
+                                      expect=company)
+        if ok:
             text = p.get_all_text()
-            if not _name_matches(text[:120], company):
-                continue                        # wrong company behind a 200 — keep looking
             f = re.findall(r"([\d][\d,.]*[KMkm]?)\s*followers", text)
             e = re.findall(r"([\d][\d,.]*[KMkm]?)\s*employees", text)
             if f:
                 return (_num(f[0]), _num(e[0]) if e else None, slug)
-        except Exception:
-            pass
-        finally:
-            time.sleep(sleep)                   # politeness: hundreds of companies per backfill
+        time.sleep(sleep)                       # politeness: hundreds of companies per backfill
     return (None, None, None)
 
 
@@ -142,8 +106,9 @@ def save_cache(cache):
         json.dump(cache, fh, indent=1, sort_keys=True)
 
 
-_SUFFIXES = ("freight", "ventures", "labs", "studios", "health", "cloud", "ai", "robotics",
-             "technologies", "technology", "financial", "capital", "industries")
+# One suffix list, shared with the name gate in radar/fetch.py — two copies would drift.
+from radar.fetch import SUFFIXES as _SUFFIXES
+
 # Divisions inherit the parent's band: an Uber Freight PM intern is an Uber-caliber seat.
 _PARENT = {"alphabet": "google", "metaplatforms": "meta", "square": "block",
            "facebook": "meta", "xdevelopment": "google", "waymo": "google",
@@ -243,15 +208,16 @@ def resolve_slug_via_search(company, engines=("duckduckgo", "bing")):
     page actually belongs to this name and take the slug from the result URL.
 
     Deterministic — no model. Claude is only reached if this fails too."""
-    from scrapling.fetchers import StealthyFetcher
+    from radar.fetch import validated_fetch
     urls = {"duckduckgo": "https://html.duckduckgo.com/html/?q={q}",
             "bing": "https://www.bing.com/search?q={q}"}
     q = f"{company} linkedin company".replace(" ", "+")
     for eng in engines:
         try:
-            p = StealthyFetcher.fetch(urls[eng].format(q=q), headless=True,
-                                      network_idle=False, timeout=40000)
-            if p.status != 200:
+            # allow_redirect_host: search endpoints bounce between their own hosts and we
+            # are reading result LINKS, not asserting the page's identity.
+            p, ok, _why = validated_fetch(urls[eng].format(q=q), allow_redirect_host=True)
+            if not ok:
                 continue
             hits = re.findall(r"linkedin\.com/company/([a-z0-9\-_.]+)", p.get_all_text() + str(p.body), re.I)
             seen = []
@@ -271,21 +237,18 @@ def resolve_slug_via_search(company, engines=("duckduckgo", "bing")):
 
 
 def _try_slug(slug, company):
-    """Fetch one slug through both gates. Returns (followers, employees, passed)."""
-    from scrapling.fetchers import StealthyFetcher
-    try:
-        p = StealthyFetcher.fetch(f"https://www.linkedin.com/company/{slug}/",
-                                  headless=True, network_idle=False, timeout=40000)
-        if p.status != 200 or not _redirect_ok(getattr(p, "url", ""), slug):
-            return (None, None, False)
-        text = p.get_all_text()
-        if not _name_matches(text[:120], company):
-            return (None, None, False)
-        f = re.findall(r"([\d][\d,.]*[KMkm]?)\s*followers", text)
-        e = re.findall(r"([\d][\d,.]*[KMkm]?)\s*employees", text)
-        return ((_num(f[0]) if f else None), (_num(e[0]) if e else None), bool(f))
-    except Exception:
+    """Fetch one slug through both identity gates (radar/fetch.py).
+    Returns (followers, employees, passed)."""
+    from radar.fetch import validated_fetch
+    p, ok, why = validated_fetch(f"https://www.linkedin.com/company/{slug}/", expect=company)
+    if not ok:
+        if p is not None and "status" not in why:     # wrong-200: log WHY, a miss must not
+            print(f"[tiers] rejected {slug!r} for {company!r}: {why}")   # look like a 404
         return (None, None, False)
+    text = p.get_all_text()
+    f = re.findall(r"([\d][\d,.]*[KMkm]?)\s*followers", text)
+    e = re.findall(r"([\d][\d,.]*[KMkm]?)\s*employees", text)
+    return ((_num(f[0]) if f else None), (_num(e[0]) if e else None), bool(f))
 
 
 def resolve(company):
@@ -306,7 +269,9 @@ def resolve_unresolved_with_claude(limit=25, timeout=900):
     Claude gets Scrapling and web search and must return STRICT JSON mapping company -> slug.
     Every returned slug is then re-verified through the SAME gates as any other fetch — a
     model's answer earns no trust the deterministic path would not have gotten."""
-    import json, subprocess
+    import json
+
+    from radar.joints import run_joint
     cache = load_cache()
     pending = [v["company"] for v in cache.values() if v.get("needs_resolution")][:limit]
     if not pending:
@@ -325,8 +290,7 @@ def resolve_unresolved_with_claude(limit=25, timeout=900):
         "Return ONLY JSON: {\"Company Name\": \"slug\"}. Omit any company you cannot verify — "
         "an omission is correct, a guess is not.\n\nCOMPANIES:\n" + "\n".join(pending))
     try:
-        out = subprocess.run(["claude", "-p", prompt, "--permission-mode", "bypassPermissions"],
-                             capture_output=True, text=True, timeout=timeout).stdout
+        out = run_joint("slug_resolve", prompt, timeout=timeout).stdout
         body = out.split("```")[1].lstrip("json").strip() if "```" in out else out.strip()
         mapping = json.loads(body[body.find("{"):body.rfind("}") + 1])
     except Exception as ex:
