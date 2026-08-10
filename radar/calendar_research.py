@@ -90,7 +90,14 @@ def run(timeout=None, model=None):
     try:
         new = yaml.safe_load(body)
     except Exception as ex:
-        return {"ok": False, "error": f"unparseable YAML: {ex}"}
+        # Keep the evidence: a parse failure with no raw output is undebuggable (three
+        # blind failures before this line existed, 2026-08-10). Overwritten each failure.
+        raw_p = os.path.join(ROOT, "data", "calendar_last_raw.txt")
+        try:
+            open(raw_p, "w").write(out)
+        except OSError:
+            pass
+        return {"ok": False, "error": f"unparseable YAML: {ex}", "raw_saved": raw_p}
     if not isinstance(new, list) or len(new) < 5:
         return {"ok": False, "error": f"refusing to write: got {type(new).__name__} len "
                                       f"{len(new) if hasattr(new,'__len__') else '?'}"}

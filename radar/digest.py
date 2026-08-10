@@ -69,9 +69,9 @@ def send_email(subject, body_html):
     """Clean-subject HTML email into the operator's inbox — no '[owner/repo]' prefix, full color.
 
     Composio's active Gmail connection drifts across his accounts, so branch on it:
-      * active IS the destination mailbox (same domain) -> INSERT straight into it, then label INBOX+UNREAD.
+      * active IS the UCLA mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
         (Plain SEND would self-bury in Sent, since example.edu and g.example.edu are one mailbox.)
-      * active is any other account -> SEND from there to the destination (different sender = normal arrival).
+      * active is any other account -> SEND from there to UCLA (different sender = normal inbox arrival).
     Either branch yields a clean subject + full HTML. Falls back to the GitHub-issue relay only if
     Composio fails outright, so a delivery outage still reaches him (just with the botty prefix)."""
     if DRY:
@@ -274,6 +274,13 @@ def main():
     since = state.get("last_ts", 0)
     notified = set(state.get("notified_programs", []))
     today = date.today()
+
+    # Sent-today check FIRST: every hourly retry after a successful send was burning
+    # 2-4 minutes of model time re-annotating 40 display rows before reaching the guard
+    # (observed 2026-08-10). Nothing downstream matters if today's email already went.
+    if not DRY and _sent_today():
+        print("digest already sent today — nothing to do")
+        return
 
     # ---- load queue ----
     allrows = []
