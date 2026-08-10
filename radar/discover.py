@@ -109,36 +109,54 @@ def discover(families=None, timeout=None, per_query=None):
     (poll.py ingests data/discovered.jsonl) and is scored, gated and deduped like any other
     row -- discovery widens the funnel, it never bypasses the filters.
 
-    Model + timeout come from the JOINTS registry (radar/joints.py, "discovery")."""
+    Model + timeout come from the JOINTS registry (radar/joints.py, "discovery").
+
+    One joint call PER FAMILY. The all-families-in-one-call version blew its own 900s
+    timeout on its first nightly run (2026-08-10: one family alone takes ~9 minutes of
+    real web search), so every family was silently never answered. Families are
+    independent — this is the one genuinely fan-out-shaped stage — so each gets its own
+    bounded call and its own log line; a family that fails costs itself, not the night."""
     import json as _json
 
     from radar.joints import run_joint
-    fams = families or list(FAMILY_QUERIES)
-    wanted = "\n".join(f"- {f}: " + "; ".join(FAMILY_QUERIES[f]) for f in fams if f in FAMILY_QUERIES)
-    prompt = (
-        "Find CURRENTLY OPEN US internship/co-op postings matching the role families below. "
-        "Use web search. Prefer postings on applicant-tracking hosts (boards.greenhouse.io, "
-        "jobs.ashbyhq.com, jobs.lever.co, myworkdayjobs.com) and official company career pages.\n\n"
-        f"{wanted}\n\n"
-        "Rules:\n"
-        "1. Only postings you have actually seen. Do not construct plausible URLs.\n"
-        "2. Only roles open to undergraduates. Exclude MBA-only, new-grad and senior roles.\n"
-        "3. Prefer things unlikely to appear on aggregator lists.\n"
-        "4. Return ONLY a JSON array, no prose: "
-        "[{\"url\":\"...\",\"company\":\"...\",\"title\":\"...\",\"family\":\"...\"}]\n"
-        "5. An empty array is a correct answer. A fabricated URL is not.")
-    try:
-        r = run_joint("discovery", prompt, timeout=timeout)
-        body = r.stdout
-        body = body.split("```")[1].lstrip("json").strip() if "```" in body else body.strip()
-        rows = _json.loads(body[body.find("["):body.rfind("]") + 1])
-    except Exception as ex:
-        print(f"[discover] model pass failed ({type(ex).__name__}); falling back to scraper")
-        return discover_scraped(families=families, per_query=per_query or 1)
-    out = []
-    for x in rows if isinstance(rows, list) else []:
-        if isinstance(x, dict) and str(x.get("url", "")).startswith("http"):
-            out.append({"url": x["url"], "company": x.get("company", ""),
-                        "title": x.get("title", ""), "family": x.get("family", ""),
-                        "source": "discovery"})
+    fams = [f for f in (families or list(FAMILY_QUERIES)) if f in FAMILY_QUERIES]
+    out, seen, failed = [], set(), []
+    for fam in fams:
+        wanted = f"- {fam}: " + "; ".join(FAMILY_QUERIES[fam])
+        prompt = (
+            "Find CURRENTLY OPEN US internship/co-op postings matching the role family below. "
+            "Use web search. Prefer postings on applicant-tracking hosts (boards.greenhouse.io, "
+            "jobs.ashbyhq.com, jobs.lever.co, myworkdayjobs.com) and official company career pages.\n\n"
+            f"{wanted}\n\n"
+            "Rules:\n"
+            "1. Only postings you have actually seen. Do not construct plausible URLs.\n"
+            "2. Only roles open to undergraduates. Exclude MBA-only, new-grad and senior roles.\n"
+            "3. Prefer things unlikely to appear on aggregator lists.\n"
+            "4. Return ONLY a JSON array, no prose: "
+            "[{\"url\":\"...\",\"company\":\"...\",\"title\":\"...\",\"family\":\"...\"}]\n"
+            "5. An empty array is a correct answer. A fabricated URL is not.")
+        try:
+            r = run_joint("discovery", prompt, timeout=timeout)
+            body = r.stdout
+            body = body.split("```")[1].lstrip("json").strip() if "```" in body else body.strip()
+            rows = _json.loads(body[body.find("["):body.rfind("]") + 1])
+        except Exception as ex:
+            print(f"[discover] {fam}: model pass failed ({type(ex).__name__})")
+            failed.append(fam)
+            continue
+        n = 0
+        for x in rows if isinstance(rows, list) else []:
+            if isinstance(x, dict) and str(x.get("url", "")).startswith("http") \
+                    and x["url"] not in seen:
+                seen.add(x["url"])
+                out.append({"url": x["url"], "company": x.get("company", ""),
+                            "title": x.get("title", ""), "family": x.get("family", fam),
+                            "source": "discovery"})
+                n += 1
+        print(f"[discover] {fam}: {n} postings")
+    if failed and not out:
+        # scraper fallback only when EVERY family failed: partial model results beat
+        # scraper noise, and the scraper mostly returns nothing anyway (dead instances)
+        print(f"[discover] all model passes failed; falling back to scraper for {failed}")
+        return discover_scraped(families=failed, per_query=per_query or 1)
     return out
