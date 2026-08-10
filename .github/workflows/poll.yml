@@ -30,7 +30,15 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           GMAIL_SENDER: ${{ secrets.GMAIL_SENDER }}
           ALERT_TO: ${{ secrets.ALERT_TO }}
-        run: python -m radar.poll
+        run: |
+          # The UNCONFIGURED template repo must skip green, not fail red every 2 hours
+          # and email the owner (observed 2026-08-10). Forks activate by committing the
+          # real configs per SETUP.md; person.yaml stays private via .gitignore.
+          if [ ! -f config/profile.yaml ]; then
+            echo "No config/profile.yaml - unconfigured template. Copy config/*.example.yaml to activate (SETUP.md). Skipping."
+            exit 0
+          fi
+          python -m radar.poll
       - name: Commit state
         run: |
           git config user.name "github-actions[bot]"

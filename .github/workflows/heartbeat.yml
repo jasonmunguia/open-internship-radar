@@ -19,4 +19,9 @@ jobs:
       - name: Check pulse
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python -m radar.heartbeat
+        run: |
+          if [ ! -f config/profile.yaml ]; then
+            echo "Unconfigured template - no pulse to check. Skipping."
+            exit 0
+          fi
+          python -m radar.heartbeat
