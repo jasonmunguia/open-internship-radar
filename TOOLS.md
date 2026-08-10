@@ -82,8 +82,9 @@ surfaced a fifth the prose had missed — which is why the registry exists.)
    failed: may edit only that source's entry in sources.yaml, must verify jobs return,
    never commits.
 
-Title-variant mining from `data/dropped_unmatched.jsonl` PROPOSES patterns to a human; it
-never auto-adds them.
+Title-variant mining from `data/dropped_unmatched.jsonl` is MANUAL today: ask an agent to
+mine the local drop log; it PROPOSES patterns to a human and never auto-adds them. (No
+automated nightly miner exists; the log only accumulates on the local machine.)
 
 ## Failure modes and what they look like
 

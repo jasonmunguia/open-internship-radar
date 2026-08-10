@@ -246,8 +246,9 @@ def score_posting(posting, profile, funded=None, tier_cache=None):
     # apply list. The old dream-tier bypass is gone with it.
     # Consequence, accepted deliberately: title+description regex is now the ONLY route in,
     # so pattern coverage is the single point of failure. Mitigated by logging every drop at
-    # a T1/T2 company to data/dropped_unmatched.jsonl, which the nightly Claude pass mines for
-    # real title variants and PROPOSES as new patterns. It proposes; it never auto-adds.
+    # a T1/T2 company to data/dropped_unmatched.jsonl (local machine only; gitignored, so
+    # cloud-runner drops are ephemeral). Mining it for title variants is a MANUAL agent ask
+    # today — no automated pass exists. Proposals go to a human; nothing is auto-added.
     if best_cluster is None:
         if band <= 2:
             _log_unmatched(company, title, posting.get("url", ""), band)
