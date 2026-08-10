@@ -38,11 +38,11 @@ def _person():
     try:
         with open(os.path.join(ROOT, "config", "person.yaml")) as fh:
             p = yaml.safe_load(fh) or {}
-        return (p.get("identity", {}).get("repo") or "jasonmunguia/internship-radar",
-                p.get("delivery", {}).get("to") or "jasonmunguia@ucla.edu",
+        return (p.get("identity", {}).get("repo") or "<you>/internship-radar",
+                p.get("delivery", {}).get("to") or "you@example.edu",
                 p.get("delivery", {}).get("send_as") or "personal")
     except Exception:
-        return "jasonmunguia/internship-radar", "jasonmunguia@ucla.edu", "personal"
+        return "<you>/internship-radar", "you@example.edu", "personal"
 
 
 REPO, TO_ADDR, SEND_AS = _person()
