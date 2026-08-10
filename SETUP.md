@@ -1,4 +1,4 @@
-# SETUP — bring your own keys, ~15 minutes
+# SETUP — bring your own keys, 30-60 minutes (most of it is deciding what you want)
 
 This runs on your own Claude subscription and free tiers. No API keys are required for the
 core loop. Costs nothing beyond what you already pay for.
@@ -28,13 +28,20 @@ Send FROM a personal account TO wherever you read mail — **do not send from an
 itself**, Gmail files self-sends under Sent with no INBOX label and you will never see them.
 
 ## 4. Cloud polling
-Push to GitHub. `.github/workflows/poll.yml` runs every 2h on Actions with no secrets beyond
-the default `GITHUB_TOKEN`.
+Push to a PRIVATE GitHub repo (your click/application history lives in it).
+`.github/workflows/poll.yml` runs every 2h on Actions. The default `GITHUB_TOKEN` is
+enough for polling + issue-relay alerts; for CLEAN-SUBJECT alert emails add three repo
+secrets: `GMAIL_APP_PASSWORD`, `GMAIL_SENDER`, `ALERT_TO`.
 
-## 5. Local digest
-Copy `com.internship-digest.plist` to `~/Library/LaunchAgents/`, edit the paths and
-label, then `launchctl load` it. It must run locally — the re-rank needs your Claude session.
-
+## 5. Local jobs (four launchd templates in docs/)
+Copy each `docs/launchd-*.plist.example` to `~/Library/LaunchAgents/com.internship-<name>.plist`,
+replace every `/Users/YOURNAME` with your real home directory (launchd expands neither `~`
+nor `$HOME`), check the python3 path, then `launchctl load` each. Schedules: scrape 7:05,
+digest 7:20 with hourly retries to 18:20 (the StartCalendarInterval array IS the retry
+mechanism), nightly 2:10, selfheal every 30 min. The digest must run locally — the
+eligibility joint needs your local coding-agent CLI. Also copy
+`config/release_calendar.example.yaml` to `release_calendar.yaml` and seed it with
+programs YOU care about, or the pre-network email stays empty.
 ## 6. Click relay (optional but recommended)
 Without it the emails still work; you just lose tap-to-clear, so rows never leave the queue.
 
@@ -48,6 +55,7 @@ deliver and clicks log nothing, silently.
 
 ## 7. Verify before trusting it
 ```
-IR_DRY=1 python3 -m radar.digest          # renders to /tmp, sends nothing
+IR_DRY=1 python3 -m radar.digest          # renders to /tmp; sends nothing, WRITES nothing
 ```
-The flag is `IR_DRY`. `DRY=1` does nothing and will send real mail.
+The flag is `IR_DRY`. `DRY=1` does nothing and will send real mail. A dry run is fully
+read-only — it does not sync the production clone, advance state, or start day counters.

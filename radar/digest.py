@@ -1,5 +1,5 @@
 """Morning digest — runs LOCALLY on the operator's Mac at 7:20am via launchd.
-Sends up to THREE emails via Composio (g.example.edu -> example.edu):
+Sends up to THREE emails — SMTP (tools/mailer.py) primary, Composio fallback:
   #1 NETWORKING HEADS-UP: programs opening within 14 days (only newly-entered ones) -> pre-warm referrals.
   #2 DAILY APPLY LIST: roles open <=14 days, color-coded by industry, AI eligibility-filtered.
   #3 BURNING/just-dropped: handled in real time by the cloud poller as GitHub-issue emails (0-token) — not here.
@@ -66,12 +66,12 @@ def _raw_message(subject, body_html, frm, to):
     return base64.urlsafe_b64encode(m.as_bytes()).decode()
 
 def send_email(subject, body_html):
-    """Clean-subject HTML email into the operator's school inbox — no '[owner/repo]' prefix, full color.
+    """Clean-subject HTML email into the operator's inbox — no '[owner/repo]' prefix, full color.
 
     Composio's active Gmail connection drifts across his accounts, so branch on it:
-      * active IS the school mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
+      * active IS the destination mailbox (same domain) -> INSERT straight into it, then label INBOX+UNREAD.
         (Plain SEND would self-bury in Sent, since example.edu and g.example.edu are one mailbox.)
-      * active is any other account -> SEND from there to the school inbox (different sender = normal inbox arrival).
+      * active is any other account -> SEND from there to the destination (different sender = normal arrival).
     Either branch yields a clean subject + full HTML. Falls back to the GitHub-issue relay only if
     Composio fails outright, so a delivery outage still reaches him (just with the botty prefix)."""
     if DRY:
@@ -99,7 +99,14 @@ def send_email(subject, body_html):
         print(f"[guard] active Composio account is a work mailbox ({active}) — using GitHub relay instead")
         return _queue_github(subject, body_html)
 
-    if active.endswith("example.edu"):
+    # Same-mailbox guard, config-driven (was a hardcoded "example.edu" — a cold audit found
+    # the open twin shipped it scrubbed to a dead "example.edu" branch): if the ACTIVE
+    # account's domain is the destination's domain (or a subdomain alias of it, e.g.
+    # g.example.edu -> example.edu), a plain SEND self-buries in Sent; INSERT+label instead.
+    _to_dom = TO_ADDR.split("@")[-1].lower()
+    _act_dom = active.split("@")[-1] if "@" in active else ""
+    if _act_dom and (_act_dom == _to_dom or _act_dom.endswith("." + _to_dom)
+                     or _to_dom.endswith("." + _act_dom)):
         ok, res = _cx("GMAIL_INSERT_MESSAGE", {
             "raw": _raw_message(subject, body_html, f"Internship Radar <{TO_ADDR}>", TO_ADDR),
             "user_id": "me"})
@@ -254,7 +261,11 @@ def _sent_today():
 
 
 def main():
-    sync_status = sync_repo()
+    # A DRY run must be READ-ONLY beyond /tmp: it used to sync (or clone!) production,
+    # advance last_ts (destroying tomorrow's ⭐ markers), start day-N clocks in
+    # shown.json and fire Wayback requests — "verify before trusting it" mutated live
+    # state. Caught by a 2026-08-10 cold audit exercising SETUP.md's own verify step.
+    sync_status = sync_repo() if not DRY else "dry-skip"
     sys.path.insert(0, REPO_DIR)
 
     profile = yaml.safe_load(open(os.path.join(REPO_DIR, "config", "profile.yaml")))
@@ -321,7 +332,7 @@ def main():
     from radar import queue_state as qs
     _done = qs.acted_ids()
     roles = [r for r in roles if qs.job_id(r) not in _done]
-    _shown = qs.mark_shown(roles)
+    _shown = qs.mark_shown(roles) if not DRY else {}   # mark_shown writes shown.json + Wayback
     _relay = RELAY_BASE                                # unset -> raw links, never dead links
 
     # Re-rank what we are ABOUT TO DISPLAY, not only what is new. The rescue pass above is
@@ -382,7 +393,10 @@ def main():
     sent = []
 
     # ================= EMAIL #1 — NETWORKING HEADS-UP =================
-    cal = yaml.safe_load(open(os.path.join(REPO_DIR, "config", "release_calendar.yaml"))) or []
+    # Missing calendar = email #1 quietly absent, never a crash (a fresh fork has no
+    # calendar yet; the example ships in the open repo and the nightly joint refreshes it)
+    _calp = os.path.join(REPO_DIR, "config", "release_calendar.yaml")
+    cal = (yaml.safe_load(open(_calp)) or []) if os.path.exists(_calp) else []
     horizon = today + timedelta(days=14)
     # NAGS DAILY (changed 2026-08-08). The old `notified` set showed each program EXACTLY ONCE,
     # ever — so a single busy morning meant that networking window was never mentioned again.
@@ -489,10 +503,12 @@ def main():
     if r2:
         sent.append(f"#2 daily ({len(roles)})")
 
-    # ---- persist state ----
-    state["last_ts"] = int(time.time())
-    state["notified_programs"] = sorted(notified)
-    json.dump(state, open(STATE, "w"))
+    # ---- persist state (never on DRY: advancing last_ts on a dry run erases the
+    # new-since-yesterday window for the real morning send) ----
+    if not DRY:
+        state["last_ts"] = int(time.time())
+        state["notified_programs"] = sorted(notified)
+        json.dump(state, open(STATE, "w"))
 
     # Only if a send fell back to the GitHub relay does anything need pushing.
     pend_dir = os.path.join(REPO_DIR, "data", "pending")

@@ -12,10 +12,10 @@ background: each entry is load-bearing somewhere in the pipeline.
 
 | Source type | Count | Reached by | Detection lag |
 |---|---|---|---|
-| Direct ATS APIs | 112 | plain HTTPS JSON — Greenhouse, Ashby, Lever, Workday, Getro, Consider, SmartRecruiters, Eightfold | <= 2h (poll interval) |
-| Job-list GitHub repos | 26 | GitHub raw markdown fetch | repo update lag + <= 2h |
+| Direct ATS APIs | 120 | plain HTTPS JSON — Greenhouse, Ashby, Lever, Workday, Getro, Consider, SmartRecruiters, Eightfold | <= 2h (poll interval) |
+| Job-list GitHub repos | 25 | GitHub raw markdown fetch | repo update lag + <= 2h |
 | Newsletters | 7 | Substack JSON | days |
-| Watch pages | 6 | HTML fetch, Scrapling when blocked | <= 2h |
+| Watch pages | 12 | HTML fetch, Scrapling when blocked | <= 2h |
 | SEC Form D | — | EDGAR full index (free, no key) | daily |
 
 Walled employers (Google, Microsoft, LinkedIn, Apple, Amazon, Goldman) publish no pollable
@@ -103,12 +103,7 @@ never auto-adds them.
 
 ## Deliberately not used
 
-**YC Bookface** — `radar/bookface.py` is written and functional but called by nothing.
-the operator's access runs through an employer's YC account; logging in would leave job-search
-activity attributable to him inside an org he is leaving. Operating-security decision, not a
-technical one. Re-enable only against a YC account he controls independently.
-
-**Handshake** — same shape of exclusive-channel value, declined 2026-08-08.
+**Member networks and credentialed portals** (Bookface, Handshake and kin) — excluded by design: a radar must never operate someone's account, and job-search activity inside a members-only network is attributable to the member. If you want that coverage, browse it yourself.
 
 **Paid enrichment (Apollo / Clay / FullEnrich)** — the data these were wanted for (follower
 counts, headcount) sits on public pages that Scrapling reads for free. Check the public page

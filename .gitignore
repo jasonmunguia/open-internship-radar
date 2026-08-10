@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+data/dropped_unmatched.jsonl
 .vercel/
-data/
+data/shown.json
 config/person.yaml
+config/release_calendar.yaml

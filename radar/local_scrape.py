@@ -66,7 +66,10 @@ def main():
                 if prev and prev != digest_:
                     sys.path.insert(0, os.path.expanduser("~/.claude/tools"))
                     import mailer
-                    mailer.send("personal", "you@example.edu",
+
+                    # identity comes from settings, never a literal (cold-audit fix)
+                    from radar.settings import SEND_AS, TO_ADDR
+                    mailer.send(SEND_AS, TO_ADDR,
                                 f"📜Deadline page changed — {name}",
                                 f"<p><b>{name}</b> changed since the last check.</p>"
                                 f"<p><a href='{url}'>{url}</a></p>"

@@ -12,7 +12,10 @@
 export default async function handler(req, res) {
   const { j = "", u = "", k = "applied" } = req.query || {};
   const target = safeUrl(u);
-  const action = ["applied", "networked"].includes(k) ? k : "applied";
+  // "undo" must be whitelisted or the Undo link below LOGS ANOTHER APPLY — shipped
+  // that way until a 2026-08-10 cold audit traced k=undo into the coercion.
+  // queue_state.py has handled "undo" all along.
+  const action = ["applied", "networked", "undo"].includes(k) ? k : "applied";
 
   try {
     await fetch(`https://api.github.com/repos/${process.env.GH_REPO}/dispatches`, {

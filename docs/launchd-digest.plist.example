@@ -1,3 +1,6 @@
+<!-- IMPORTANT: launchd expands NEITHER ~ NOR $HOME. Replace every
+     /Users/YOURNAME with your real home directory (run: echo $HOME),
+     and check the python3 path matches yours (run: which python3). -->
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -5,7 +8,7 @@
 	<key>EnvironmentVariables</key>
 	<dict>
 		<key>PATH</key>
-		<string>$HOME/.composio:$HOME/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+		<string>/Users/YOURNAME/.composio:/Users/YOURNAME/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
 		<key>SSL_CERT_FILE</key>
 		<string>/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/certifi/cacert.pem</string>
 	</dict>
@@ -97,6 +100,6 @@
 		</dict>
 	</array>
 	<key>WorkingDirectory</key>
-	<string>~/.internship-radar</string>
+	<string>/Users/YOURNAME/.internship-radar</string>
 </dict>
 </plist>

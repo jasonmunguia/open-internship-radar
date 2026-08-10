@@ -1,0 +1,67 @@
+# EXAMPLE release calendar — copy to release_calendar.yaml and REPLACE with programs YOU
+# care about (AGENT_ONBOARDING.md question 3's "thrilled by" list is the right seed).
+# Every expected_open is an ESTIMATE that decays; the nightly calendar joint re-researches
+# each entry against the web and against real post dates the system itself observes
+# (data/observed_opens.jsonl). The digest's pre-network email surfaces entries opening
+# within 14 days. The joint refuses to manage a calendar with fewer than 5 entries.
+# Dates below were public estimates as of 2026-08; treat them as placeholders, not facts.
+
+- program: "Palantir Internships (Deployment Strategist, Product)"
+  company: Palantir
+  expected_open: "2026-08-15"
+  confidence: medium
+  cadence: annual
+  terms: [summer]
+  deadline_behavior: "rolling until filled; apply in the first 2 weeks"
+  requirements: "some seats need work authorization or clearance eligibility"
+  evidence: "https://www.palantir.com/careers/"
+
+- program: "Anduril Internships"
+  company: Anduril
+  expected_open: "2026-08-15"
+  confidence: medium
+  cadence: annual
+  terms: [summer]
+  deadline_behavior: "rolling review begins late summer, fills through fall"
+  requirements: "US person (ITAR)"
+  evidence: "https://www.anduril.com/careers/"
+
+- program: "SpaceX internships"
+  company: SpaceX
+  expected_open: "2026-08-01"
+  confidence: medium
+  cadence: per-term
+  terms: [spring, summer, fall]
+  deadline_behavior: "per-term reqs post ~2 quarters ahead; rolling"
+  requirements: "US person (ITAR)"
+  evidence: "https://www.spacex.com/careers/"
+
+- program: "McKinsey Summer Business Analyst"
+  company: McKinsey
+  expected_open: "2026-09-01"
+  confidence: low
+  cadence: annual
+  terms: [summer]
+  deadline_behavior: "HARD deadline, typically mid-summer for the following year"
+  requirements: "none stated"
+  evidence: "https://www.mckinsey.com/careers/students"
+
+- program: "BCG Summer Associate"
+  company: BCG
+  expected_open: "2026-09-01"
+  confidence: low
+  cadence: annual
+  terms: [summer]
+  deadline_behavior: "HARD deadline; check the local office's recruiting page"
+  requirements: "none stated"
+  evidence: "https://careers.bcg.com/students"
+
+- program: "Tesla internships (ops/supply chain)"
+  company: Tesla
+  expected_open: "2026-08-01"
+  confidence: low
+  cadence: rolling
+  terms: [spring, summer, fall]
+  deadline_behavior: "reqs post ad-hoc year-round; apply within days"
+  requirements: "none stated"
+  evidence: "https://www.tesla.com/careers"

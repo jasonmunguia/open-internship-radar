@@ -72,6 +72,9 @@ def run(timeout=None, model=None):
 
     from radar.joints import run_joint
     from radar.observed import evidence_block
+    if not os.path.exists(CAL):
+        return {"ok": False, "error": "no config/release_calendar.yaml - copy "
+                                      "release_calendar.example.yaml and edit it first"}
     current = open(CAL).read()
     prompt = PROMPT.format(today=date.today().isoformat(), calendar=current,
                            observed=evidence_block())

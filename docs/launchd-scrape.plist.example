@@ -1,0 +1,20 @@
+<!-- IMPORTANT: launchd expands NEITHER ~ NOR $HOME. Replace every
+     /Users/YOURNAME with your real home directory (run: echo $HOME),
+     and check the python3 path matches yours (run: which python3). -->
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.internship-scrape</string>
+  <key>ProgramArguments</key>
+  <array><string>/Library/Frameworks/Python.framework/Versions/3.11/bin/python3</string>
+         <string>-m</string><string>radar.local_scrape</string></array>
+  <key>WorkingDirectory</key><string>/Users/YOURNAME/.internship-radar</string>
+  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>7</integer><key>Minute</key><integer>5</integer></dict>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/Users/YOURNAME/.composio:/Users/YOURNAME/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>SSL_CERT_FILE</key><string>/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/certifi/cacert.pem</string></dict>
+  <key>StandardOutPath</key><string>/tmp/internship-scrape.log</string>
+  <key>StandardErrorPath</key><string>/tmp/internship-scrape.log</string>
+</dict>
+</plist>

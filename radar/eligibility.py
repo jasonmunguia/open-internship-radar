@@ -6,28 +6,40 @@ non-US, full-time/new-grad titles); it never expresses preference. Which roles a
 showing is decided upstream by role family + company tier. It was previously named
 `rerank`, and that name hid a real bug: nobody asked what a "reranker" ranked ON while it
 silently graded resume-fit and deleted qualifying jobs. Renamed 2026-08-09."""
-import json
+import json, os
 
 from radar.joints import JOINTS, run_joint
 
-ELIGIBILITY = """HARD ELIGIBILITY FACTS (the only thing you may judge):
-- EDIT THESE TO THE OPERATOR (AGENT_ONBOARDING.md question 2 collects them; setup is NOT
-  done while this block still carries the template):
-- Undergraduate, class of 20XX. Eligible ONLY for internships, fellowships, co-ops and
-  undergraduate programs. NOT full-time, NOT new-grad, NOT senior/staff/manager roles.
-- Terms available: <the terms they can actually work>.
-- US-based roles only (or their real location constraint).
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-You are NOT judging interest, prestige, career value, or fit to a person. Whether this
-role is desirable has ALREADY been decided upstream by role-family matching and company
-tier. Your only job is to catch roles the keyword scorer wrongly let through because they
-are IMPOSSIBLE to apply to."""
+
+def _eligibility_facts():
+    """The operator's hard facts, read from config/profile.yaml (eligibility_facts) at
+    call time — NEVER hardcoded here. radar/*.py must not carry a name, class year, or
+    preference (the ARCHITECTURE.md boundary); a 2026-08-10 cold audit caught this
+    module violating that with a baked-in "class of 2028" block. A missing config block
+    raises loudly: judging with unknown facts is worse than not judging, and the raise
+    flows into the batch-failure counter, so the digest DEFERS instead of sending."""
+    import yaml
+    facts = (yaml.safe_load(open(os.path.join(_ROOT, "config", "profile.yaml")))
+             or {}).get("eligibility_facts") or {}
+    if not facts:
+        raise RuntimeError("config/profile.yaml has no eligibility_facts block — the "
+                           "eligibility joint refuses to judge with unknown facts. "
+                           "See config/profile.example.yaml (open repo) or SETUP.md.")
+    lines = "\n".join(f"- {v}" for v in facts.values())
+    return (f"HARD ELIGIBILITY FACTS (the only thing you may judge):\n{lines}\n\n"
+            "You are NOT judging interest, prestige, career value, or fit to a person. "
+            "Whether this role is desirable has ALREADY been decided upstream by "
+            "role-family matching and company tier. Your only job is to catch roles the "
+            "keyword scorer wrongly let through because they are IMPOSSIBLE to apply to.")
+
 
 def _prompt(batch):
     roles = [{"i": i, "company": r.get("company", ""), "title": r.get("title", ""),
               "location": r.get("location", ""), "dept": r.get("department", "")}
              for i, r in enumerate(batch)]
-    return (f"{ELIGIBILITY}\n\n"
+    return (f"{_eligibility_facts()}\n\n"
             f"For each role return:\n"
             f"  eligible: true/false — false ONLY for a hard, checkable barrier: wrong degree level,\n"
             f"    class-year restriction (freshman/sophomore-only), full-time/new-grad/senior title,\n"

@@ -5,17 +5,20 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key><string>com.internship-nightly</string>
+  <key>Label</key><string>com.internship-selfheal</string>
   <key>ProgramArguments</key>
   <array><string>/Library/Frameworks/Python.framework/Versions/3.11/bin/python3</string>
-         <string>-m</string><string>radar.nightly</string></array>
+         <string>-m</string><string>radar.self_heal</string></array>
   <key>WorkingDirectory</key><string>/Users/YOURNAME/.internship-radar</string>
-  <key>StartCalendarInterval</key><dict><key>Hour</key><integer>2</integer><key>Minute</key><integer>10</integer></dict>
+  <!-- RunAtLoad = fires the moment the Mac boots/logs in, so a failure that happened while it was
+       closed gets repaired immediately on wake. StartInterval keeps checking every 30 min after. -->
+  <key>RunAtLoad</key><true/>
+  <key>StartInterval</key><integer>1800</integer>
   <key>EnvironmentVariables</key><dict>
-    <key>PATH</key><string>/Users/YOURNAME/.local/bin:/Users/YOURNAME/.composio:/usr/local/bin:/usr/bin:/bin</string>
+    <key>PATH</key><string>/Users/YOURNAME/.composio:/Users/YOURNAME/.local/bin:/usr/local/bin:/usr/bin:/bin</string>
     <key>SSL_CERT_FILE</key><string>/Library/Frameworks/Python.framework/Versions/3.11/lib/python3.11/site-packages/certifi/cacert.pem</string>
-    <key>IR_BACKFILL_LIMIT</key><string>150</string></dict>
-  <key>StandardOutPath</key><string>/tmp/internship-nightly.log</string>
-  <key>StandardErrorPath</key><string>/tmp/internship-nightly.log</string>
+  </dict>
+  <key>StandardOutPath</key><string>/tmp/internship-selfheal.log</string>
+  <key>StandardErrorPath</key><string>/tmp/internship-selfheal.log</string>
 </dict>
 </plist>

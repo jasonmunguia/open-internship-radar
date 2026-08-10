@@ -1,10 +1,21 @@
 # WHAT YOU WANT. Copy to profile.yaml and edit — this is the file that decides everything.
 # Read METHODOLOGY.md sections 5 and 9 first; the numbers below are arithmetic, not taste.
+
+# The eligibility joint's HARD FACTS — the only things the model may judge. Read by
+# radar/eligibility.py at call time; system code carries no operator facts. REQUIRED:
+# if this block is missing (or you leave the template), the joint raises and the digest
+# DEFERS rather than judging with unknown facts. AGENT_ONBOARDING.md question 2 fills it.
+eligibility_facts:
+  level: "<degree level>, class of 20XX. Eligible ONLY for <internships / co-ops / the programs you can actually take>. NOT <what you cannot take: full-time, new-grad, senior roles...>."
+  terms: "Terms available: <the terms you can actually work>."
+  location: "<your real location constraint, e.g. US-based roles only>."
 identity:
   name: Your Name
   school: Your University, Your Major, Class of 20XX
   terms_wanted: [fall-2026, winter-2027, spring-2027, summer-2027]
-  location: any US (state your real constraint — it is used as a hard gate)
+  location: any US  # informational. The shipped HARD location gate is US-only, in
+                    # radar/score.py (is_us_location) + tests/test_location.py — a
+                    # non-US constraint means editing both; see README "Retargeting".
 
 
 # Angles are OPTIONAL and OFF by default. They inject a per-family pitch line into each

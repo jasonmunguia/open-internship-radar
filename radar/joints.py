@@ -6,7 +6,7 @@ file IS the rule, encoded: every model call reads its config from here and goes 
 run_joint(), and tests/test_joints.py fails the moment a CLI call appears that is not
 registered. A new joint requires a deliberate entry in this dict — it cannot appear by
 accident. (The registry earned its keep the day it was written: building it surfaced a
-fifth joint, source_heal, that the prose inventory in NEXT.md had forgotten.)
+fifth joint, source_heal, that the original prose inventory had forgotten.)
 
 Model selection rule, with its incident: MATCH THE MODEL TO THE JOB. Scoring rows
 against a fixed profile is a small-model task; invoking a frontier model made it slower

@@ -1,6 +1,6 @@
 name: notify
 # When the local digest pushes a file into data/pending/, create the issue AS THE BOT
-# so GitHub emails the operator (it won't email him for issues he creates himself).
+# so GitHub emails the operator (it won't email them for issues he creates themself).
 on:
   push:
     paths: ["data/pending/**"]

@@ -18,8 +18,9 @@ plists set it. An interactive shell does NOT — export it before hand-testing a
 `export SSL_CERT_FILE=$(python3 -c "import certifi; print(certifi.where())")`.
 A probe returning 0 results is usually this, not an absence of data.
 
-**PyYAML** (`requirements.txt`) — config parsing.
-Without it: import error at startup (loud, safe).
+**PyYAML + pytest** (`requirements.txt`) — config parsing; the test suites install.sh
+and CI run. Without PyYAML: import error at startup (loud, safe). Without pytest:
+install.sh's verify step reports [MISS].
 
 ## Tools
 
@@ -81,9 +82,9 @@ issue RELAY still works (it uses `GITHUB_TOKEN` inside Actions, not gh).
 `ALERT_TO`. Without Actions: no real-time alerts, no click relay backend — the local
 digest alone still works.
 
-**launchd** (macOS) — the local engine. Four jobs, plists in `~/Library/LaunchAgents/`:
-templates in `docs/` (digest 7:20 with hourly retries to 18:20, nightly 2:10).
-`SETUP.md` covers installing them. Without them: no morning emails, no nightly enrichment.
+**launchd** (macOS) — the local engine. Four jobs, ALL FOUR templates in `docs/`
+(digest 7:20 + hourly retries to 18:20, scrape 7:05, nightly 2:10, selfheal every 30
+min). `SETUP.md` covers installing them — launchd expands neither ~ nor $HOME. Without them: no morning emails, no nightly enrichment.
 
 **Vercel** (`api/a.js`, optional) — the click relay: a tap logs to `data/applied.jsonl`
 via `repository_dispatch`, then 302s to the posting. Without it: emails carry raw links

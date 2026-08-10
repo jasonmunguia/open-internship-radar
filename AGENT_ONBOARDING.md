@@ -19,10 +19,13 @@ your job collapses to Jobs 1 and 2.)
 
 Run `bash install.sh`. Read `DEPENDENCIES.md` and confirm every entry resolves. Report
 gaps in plain language — "I need a page-fetching tool, installing it now", never a
-traceback. You never ask the human to install something you can install yourself. The
-only thing you genuinely cannot do alone: their Gmail app password
-(myaccount.google.com/apppasswords → `python3 tools/mailer.py add personal their@gmail.com`
-— walk them through it when you reach delivery, not before).
+traceback. You never ask the human to install something you can install yourself.
+Human-gated steps you CANNOT do alone (walk them through each when you reach it, not
+before): their Gmail app password (myaccount.google.com/apppasswords →
+`python3 tools/mailer.py add personal their@gmail.com`); the Claude Code CLI login if
+absent (it opens a browser); GitHub hosting/auth for the cloud engine — including the
+decision that their click/application history will live in that repo, so it should be
+PRIVATE; Vercel login + a fine-grained GitHub token if they want the click relay.
 
 ## Job 2 — hold the whole model (answerable cold, without searching)
 

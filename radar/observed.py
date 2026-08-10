@@ -1,4 +1,4 @@
-"""Observed ground truth for the release calendar — NEXT.md item 8b (spec item 21).
+"""Observed ground truth for the release calendar — spec item 8b/21.
 
 The calendar's expected_open dates are ESTIMATES refreshed nightly by re-researching the
 web. But the system also observes reality it used to throw away: when a req from a

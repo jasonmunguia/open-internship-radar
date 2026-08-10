@@ -1,4 +1,4 @@
-# Sources polled every 30 min by GitHub Actions.
+# Sources polled every 2 hours by GitHub Actions (skips 02:00-07:00 PT).
 # ats entries verified 2026-07-26 (see agent research); github_repos are markdown job-list repos.
 
 # Verified live 2026-07-26. Not includable (no public JSON API / bot-walled):
@@ -162,8 +162,9 @@ watch_pages:
 
   # IC / cleared agencies, added 2026-08-08. Deliberately watch_pages, not bespoke fetchers:
   # none of these publishes an API, they post to their own HTML with short hard windows
-  # (NGA's Summer 2026 window was ~4 days). USAJOBS already covers the API-addressable
-  # federal surface and is polled separately. All require US citizenship + clearance.
+  # (NGA's Summer 2026 window was ~4 days). USAJOBS is deliberately NOT polled
+  # (deprioritized 2026-07-27; needs a per-user API key) - these pages ARE the
+  # federal coverage. All require US citizenship + clearance.
   - {name: CIA student programs, url: 'https://www.cia.gov/careers/student-programs/'}
   - {name: NSA student programs, url: 'https://www.intelligencecareers.gov/nsa'}
   - {name: NGA student opportunities, url: 'https://www.nga.mil/careers/Student_Opportunities.html'}
@@ -198,7 +199,6 @@ github_repos:
   # list that explicitly covers BUSINESS roles, i.e. 6 of the 7 families. sndsh404 carries
   # off-cycle terms; LuisaE feeds the pre-network calendar rather than the apply list.
   - zshah101/Automated-List-Of-Summer-2027-and-Fall-2026-Tech-Internships
-  - zapplyjobs/Internships-2027
   - sndsh404/summer-2027-internships
   - LuisaE/opportunities
   - sharunkumar/Summer-Internships

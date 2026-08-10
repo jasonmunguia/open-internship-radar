@@ -83,8 +83,9 @@ def main():
         from radar.calendar_research import run
         return run()
 
-    # NOTE: no bookface stage. See radar/bookface.py — disabled on operating-security
-    # grounds, not technical ones. Do not re-add it.
+    # NOTE: no stage for portals that require someone's third-party credentials
+    # (member networks, logged-in job boards). Excluded by design, not by omission —
+    # a radar must never operate someone's account for them.
     for name, fn in [("funding", funding), ("tier_backfill", backfill),
                      ("slug_resolution", slugs), ("discovery", discovery),
                      ("observed_opens", observed), ("calendar_research", calendar)]:

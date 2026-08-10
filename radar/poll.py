@@ -239,7 +239,7 @@ def main():
                 create_issue(gh_repo, gh_token,
                              f"[watch] {w['name']} page changed — possible cohort/app opening",
                              f"{w['url']} content changed since last check. If applications opened, "
-                             f"apply day-one and start referral outreach. @<you>", ["watch"])
+                             f"apply day-one and start referral outreach. {MENTION}", ["watch"])
         except Exception as ex:
             print(f"[warn] watch {w['name']}: {ex}", file=sys.stderr)
 
@@ -259,7 +259,7 @@ def main():
                                  f"⚠️ [health] source '{name}' went dark ({'errors' if n < 0 else '0 results'} x{h['streak']})",
                                  f"`{name}` returned {'errors' if n < 0 else 'zero postings'} for {h['streak']} "
                                  f"consecutive polls but was healthy before. Likely an ATS migration or dead token — "
-                                 f"needs a token re-check in config/sources.yaml. @<you>", ["health"])
+                                 f"needs a token re-check in config/sources.yaml. {MENTION}", ["health"])
                     h["alerted"] = True
                 except Exception as ex:
                     print(f"[warn] health issue failed: {ex}", file=sys.stderr)
