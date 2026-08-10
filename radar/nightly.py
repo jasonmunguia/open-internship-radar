@@ -93,6 +93,23 @@ def main():
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
     json.dump(report, open(REPORT, "w"), indent=1)
+
+    # The nightly WRITES tracked data (discovered.jsonl, company_tiers.json, observed,
+    # calendar, the report). Anything left uncommitted on the production clone is
+    # destroyed by the next mirror sync — selfheal's 30-minute reset erased 10 fresh
+    # discovery rows 19 seconds after they were written (2026-08-10). The writer
+    # protects its own output: commit and push before exiting.
+    import subprocess as _sp
+
+    def _git(cmd):
+        return _sp.run(f"git -C {ROOT} {cmd}", shell=True, capture_output=True, text=True)
+    _git("add data/")
+    _git('-c user.name=radar-nightly -c user.email=nightly@local commit -q -m "nightly data [skip ci]"')
+    _git("pull --rebase -X ours -q")
+    p = _git("push -q")
+    if p.returncode != 0:
+        print(f"[nightly] push failed: {p.stderr[:150]}")
+
     failed = [k for k, v in report.items() if isinstance(v, dict) and not v.get("ok", True)]
     print(f"[nightly] done. failed stages: {failed or 'none'}")
     return 0

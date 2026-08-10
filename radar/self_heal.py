@@ -38,11 +38,11 @@ def _person():
     try:
         with open(os.path.join(ROOT, "config", "person.yaml")) as fh:
             p = yaml.safe_load(fh) or {}
-        return (p.get("identity", {}).get("repo") or "<you>/internship-radar",
-                p.get("delivery", {}).get("to") or "you@example.edu",
+        return (p.get("identity", {}).get("repo") or "jasonmunguia/internship-radar",
+                p.get("delivery", {}).get("to") or "jasonmunguia@ucla.edu",
                 p.get("delivery", {}).get("send_as") or "personal")
     except Exception:
-        return "<you>/internship-radar", "you@example.edu", "personal"
+        return "jasonmunguia/internship-radar", "jasonmunguia@ucla.edu", "personal"
 
 
 REPO, TO_ADDR, SEND_AS = _person()
@@ -182,7 +182,13 @@ def notify(subject, body_html):
 
 
 def main():
-    sh("git fetch -q origin && git reset --hard origin/main -q && git clean -fd -q")
+    # Preserve uncommitted data before snapping. This exact line, unguarded and run
+    # every 30 minutes, destroyed a night's discovery output 19 seconds after it was
+    # written and silently deleted the nightly report on every pass (2026-08-10).
+    # Stash if dirty; never clean away data/pending.
+    if sh("git status --porcelain").stdout.strip():
+        sh('git stash push -u -m "selfheal auto-stash before reset"')
+    sh("git fetch -q origin && git reset --hard origin/main -q && git clean -fdq -e data/pending")
 
     health = _load(HEALTH, {})
     state = _load(STATE, {})
