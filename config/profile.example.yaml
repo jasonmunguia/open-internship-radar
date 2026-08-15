@@ -41,23 +41,23 @@ clusters:
     angle: ops_deployment
     # Group titles by the JOB THEY DESCRIBE, not by their words. Note that Deployment
     # STRATEGIST is business-side while Forward-Deployed ENGINEER is not — same phrase, different job.
-    patterns: ["deployment strateg", "forward.?deployed strateg", "implementation strateg", "solutions intern", "field ops", "customer success", "implementation consultant"]
+    patterns: ["deployment strateg", "forward.?deployed strateg", "implementation strateg", "solutions intern(ship)?s?\\b", "field ops", "customer success", "implementation consultant"]
   cos_bizops:
     weight: 40
     angle: founder
     patterns: ["chief of staff", "founder'?s associate", "business operations", "biz ?ops",
-               "strateg.* (and|&) op", "op.* (and|&) strateg", "corporate strategy", "strategy intern",
+               "strateg.* (and|&) op", "op.* (and|&) strateg", "corporate strategy", "strategy intern(ship)?s?\\b",
                "strategy (and|&) analytics", "special projects", "revenue operations", "rev ?ops",
                "growth operations", "strategy associate", "strategy & operations"]
   gtm_bd:
     weight: 40
     angle: gtm
-    patterns: ["go.?to.?market", "gtm", "business development", "\\bbd\\b", "growth", "partnership", "capture", "commercial intern", "revenue", "sales (strategy|ops|intern)"]
+    patterns: ["go.?to.?market", "gtm", "business development", "\\bbd\\b", "growth", "partnership", "capture", "commercial intern(ship)?s?\\b", "revenue", "sales (strategy|ops|intern(ship)?s?\\b)"]
   product:
     weight: 40
     angle: product
-    patterns: ["product manage", "\\bapm\\b", "\\brpm\\b", "product intern", "product ops", "product analyst", "technical program",
-               "product development intern", "associate product builder", "product research"]
+    patterns: ["product manage", "\\bapm\\b", "\\brpm\\b", "product intern(ship)?s?\\b", "product ops", "product analyst", "technical program",
+               "product development intern(ship)?s?\\b", "associate product builder", "product research"]
   consulting:
     weight: 40
     angle: consulting
@@ -65,11 +65,11 @@ clusters:
   vc:
     weight: 40
     angle: founder
-    patterns: ["investment intern", "venture", "investor", "platform intern", "investment analyst"]
+    patterns: ["investment intern(ship)?s?\\b", "venture", "investor", "platform intern(ship)?s?\\b", "investment analyst"]
   ops_supply:
     weight: 40
     angle: ops_deployment
-    patterns: ["supply chain", "operations intern", "program manage", "project manage"]
+    patterns: ["supply chain", "operations intern(ship)?s?\\b", "program manage", "project manage"]
 
 # Company tiers (case-insensitive substring match on company name)
 tiers:
@@ -105,7 +105,10 @@ scoring:
   # EDIT THESE. They are hard gates, not preferences — anything failing them never scores.
   # The shipped values assume an undergraduate seeking internships, fellowships, and co-ops.
   # NOT full-time / new-grad (those are 2+ yrs out) and NOT senior IC/manager titles.
-  gate_patterns: ["intern", "co-?op", "fellow", "apprentice", "student", "undergrad", "university program", "campus", "sophomore", "junior year"]
+  # "intern" is word-bounded (allowing intern/interns/internship/internships) so it can
+  # never match inside "international" or "internal" — bare "intern" would pass any
+  # posting whose title or description says "international" through the gate.
+  gate_patterns: ["\\bintern(ship)?s?\\b", "co-?op", "fellow", "apprentice", "student", "undergrad", "university program", "campus", "sophomore", "junior year"]
   # Any hit in the TITLE disqualifies, even if a gate pattern also matched.
   # NB: "full-time" is NOT excluded, because a full-time *internship* is still an internship.
   # NB: plain "manager" is NOT excluded — "Product/Program Manager Intern" are valid. Only senior titles.
@@ -117,4 +120,4 @@ scoring:
     "software engineer", "\\bswe\\b", "hardware engineer", "firmware", "\\bml engineer\\b",
     "machine learning engineer", "research scientist", "research engineer", "\\bdeveloper\\b",
     "forward.?deployed engineer", "electrical engineer", "mechanical engineer", "data engineer",
-    "systems engineer", "\\bdesigner\\b", "design intern", "silicon", "\\basic\\b", "\\bsoc\\b"]
+    "systems engineer", "\\bdesigner\\b", "design intern(ship)?s?\\b", "silicon", "\\basic\\b", "\\bsoc\\b"]

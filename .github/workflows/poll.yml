@@ -24,6 +24,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Guard — US-only location gate must pass
         run: python -m tests.test_location
+      - name: Guard — intern gate must not match "international"
+        run: python -m tests.test_gate_patterns
       - name: Poll sources
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
