@@ -146,9 +146,10 @@ def is_us_location(location, text=""):
     return True                                         # unreadable -> keep
 
 def classify_industry(company, source, profile):
+    from radar.tiers import name_match
     cl = company.lower()
     for industry, names in profile.get("industries", {}).items():
-        if any(n in cl for n in names):
+        if any(name_match(n, cl) for n in names):
             return industry
     if source.startswith("usajobs"):
         return "gov"
@@ -211,9 +212,10 @@ def score_posting(posting, profile, funded=None, tier_cache=None):
     # funding-driven promotion: a recently well-funded company (stage+recency filter)
     fund_hit = None
     if funded:
+        from radar.tiers import name_match
         cl = company.lower()
         for fk, fv in funded.items():
-            if fk and fk in cl:
+            if fk and name_match(fk, cl):
                 fund_hit = fv
                 break
 

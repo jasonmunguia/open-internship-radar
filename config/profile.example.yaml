@@ -71,7 +71,8 @@ clusters:
     angle: ops_deployment
     patterns: ["supply chain", "operations intern(ship)?s?\\b", "program manage", "project manage"]
 
-# Company tiers (case-insensitive substring match on company name)
+# Company tiers (case-insensitive word-boundary match on company name — "cia" matches
+# "CIA" but not "Financial"; see radar/tiers.py name_match)
 tiers:
   # OPTIONAL override lists. Tier is normally COMPUTED from public signals (see radar/tiers.py);
   # these exist only for prestige no metric can see — top consulting firms, intelligence
@@ -88,7 +89,7 @@ bonus_keywords: [robotic, defense, autonom, "physical ai", hardware, aerospace, 
 # only to LABEL the term in the digest; they no longer contribute score.
 offcycle_patterns: ["fall", "winter", "spring", "off.?season", "off.?cycle", "co-?op"]
 
-# Industry classification -> daily digest color-coding. Company substring match;
+# Industry classification -> daily digest color-coding. Company word-boundary match;
 # falls back to source (VC board -> vc_portfolio, usajobs -> gov) then startup_other.
 industries:
   defense:      [anduril, palantir, saronic, shield, vannevar, chaos, hadrian, castelion, helsing, epirus, mach industries, allen control, regent, true anomaly, epirus]

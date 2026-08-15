@@ -133,11 +133,20 @@ def _key_candidates(company):
     return [c for i, c in enumerate(out) if c and c not in out[:i]]
 
 
+def name_match(token, company_lower):
+    """Token match with word boundaries, not bare substring. Bare `in` gave 60 false
+    dream-tier hits in one queue: 'cia' lives inside Finan-CIA-l and Asso-CIA-tion,
+    'meta' inside Metals, 'stripe' inside PlainStripes. Boundaries are anything
+    non-alphanumeric, so 'scale ai', 'in-q-tel', and '8vc' still match normally."""
+    return re.search(r"(?<![a-z0-9])" + re.escape(str(token).lower()) + r"(?![a-z0-9])",
+                     company_lower) is not None
+
+
 def override_band(company, profile):
     """Hand lists win over signals — they encode prestige no metric captures."""
     cl = company.lower()
     for tname, names in (profile.get("tiers") or {}).items():
-        if tname in OVERRIDE_BAND and any(str(t).lower() in cl for t in names):
+        if tname in OVERRIDE_BAND and any(name_match(t, cl) for t in names):
             return OVERRIDE_BAND[tname]
     return None
 
