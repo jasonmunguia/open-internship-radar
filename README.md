@@ -58,6 +58,18 @@ does it well, and stays out of the rest.
 - **Burning alert** — anything above threshold within one poll cycle, after verifying the posting
   is still live.
 
+**Warm intros (optional, the banner in every email points here).** The radar's two levers are
+applying early and applying with a referral; the emails handle the first, this handles the second.
+The play: before applying, find someone the hiring company already trusts who is one hop from
+you — the highest-yield version is alumni of your school working there. An enrichment tool
+does this in one query. [FullEnrich](https://fullenrich.com) is the one this workflow was built
+against: person search filtered by school + current company + title, then contact enrichment
+(verified work email, sometimes mobile) at roughly a cent or two per contact — searching is
+free, you pay only to enrich the person you actually intend to message. Apollo or Clay run the
+same play. None of this is wired into the pipeline on purpose: enrichment costs money per
+contact, so it stays a deliberate, per-role ask to your agent ("find me warm-intro people for
+the Stripe APM role"), never an automatic burn across every row of the queue.
+
 **A scorer that grades the role and the company, not you.** It does not model your resume. That is
 deliberate: scoring fit against one resume steers the whole funnel toward roles that resume
 already fits. The system widens; you narrow at application time.

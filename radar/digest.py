@@ -433,7 +433,9 @@ def main():
     # on-demand only — the operator asks their agent; nothing auto-runs.
     REMIND = ("<p style='background:#f0f9ff;border-left:3px solid #0284c7;padding:6px 10px;"
               "font-size:12px;color:#0c4a6e;margin:0 0 12px'>💡 Tip: ask your agent to find "
-              "warm-intro contacts for any role here before you apply.</p>")
+              "warm-intro contacts for any role here before you apply — e.g. a FullEnrich "
+              "alumni lookup (people from your school at the hiring company). See "
+              "“Warm intros” in the README.</p>")
     if upcoming:
         h = [WRAP_OPEN, REMIND,
              "<h2 style='margin:0 0 4px'>🔔 Opening within 14 days — start referral outreach NOW</h2>",
