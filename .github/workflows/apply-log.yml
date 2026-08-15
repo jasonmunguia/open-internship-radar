@@ -23,11 +23,15 @@ jobs:
           act = p.get("action", "applied")
           row = {"job_id": p.get("job_id",""), "action": act,
                  "ts": int(p.get("ts", time.time()*1000))//1000, "url": p.get("url","")}
-          with open("data/applied.jsonl","a") as fh: fh.write(json.dumps(row)+"\n")
+          # Verdict taps (👍/👎) are FEEDBACK, not queue state: routed to their own file
+          # so a 👎 never masquerades as an application in applied.jsonl.
+          dest = "data/feedback.jsonl" if act in ("yes", "no") else "data/applied.jsonl"
+          with open(dest,"a") as fh: fh.write(json.dumps(row)+"\n")
           PY
           git config user.name  "internship-radar"
           git config user.email "actions@github.com"
           git add data/applied.jsonl
+          if [ -f data/feedback.jsonl ]; then git add data/feedback.jsonl; fi
           git commit -m "click: ${{ github.event.client_payload.action }} [skip ci]" || exit 0
           git pull --rebase --autostash -q || true
           git push -q

@@ -339,8 +339,21 @@ def main():
     from radar import queue_state as qs
     _done = qs.acted_ids()
     roles = [r for r in roles if qs.job_id(r) not in _done]
+    # 👍/👎 verdict taps (2026-08-15): a 👎 is a tap, so the row leaves the list —
+    # consistent with "rows leave only when tapped". A 👍 keeps the row (the operator
+    # still has to apply) and marks it. Mis-taps recover via the flip link, last tap wins.
+    _verd = qs.verdicts()
+    roles = [r for r in roles if _verd.get(qs.job_id(r)) != "no"]
     _shown = qs.mark_shown(roles) if not DRY else {}   # mark_shown writes shown.json + Wayback
     _relay = RELAY_BASE                                # unset -> raw links, never dead links
+
+    # ---- sort: freshest postings first ----
+    # MUST run before the display eligibility pass below: that pass vets only the first
+    # 40 un-noted rows, and slicing before sorting meant "top slice" was queue-file
+    # order, not email order — a full-time "Product Manager | International" shipped
+    # unvetted at the TOP of the 2026-08-15 email while 40 rows the operator would never
+    # scroll to were vetted instead. Sorting first makes the vetted slice the visible slice.
+    roles.sort(key=lambda r: (str(r.get("posted_at") or "0000"), r.get("ts", 0), r.get("score", 0)), reverse=True)
 
     # Re-rank what we are ABOUT TO DISPLAY, not only what is new. The rescue pass above is
     # incremental (ts > since), so on any queue with history the backlog never meets the model
@@ -373,9 +386,6 @@ def main():
         if _cut:
             print("[eligibility] removed as ineligible: " +
                   "; ".join(f"{r.get('company','?')} — {r.get('eligibility_note','')}" for r in _cut))
-
-    # ---- sort: freshest postings first ----
-    roles.sort(key=lambda r: (str(r.get("posted_at") or "0000"), r.get("ts", 0), r.get("score", 0)), reverse=True)
 
     # ---- DEFER, DON'T DEGRADE (2026-08-08 per the operator) ----
     # A 10/10 email at 9am beats a 7/10 at 7:20. If the local Claude eligibility filter cannot run —
@@ -419,8 +429,13 @@ def main():
         if today <= d <= horizon and qs.program_id(e.get("program", "")) not in _netdone:
             upcoming.append((d, e))
     upcoming.sort(key=lambda t: t[0])
+    # Standing reminder on every email (2026-08-15): warm-intro lookup exists but is
+    # on-demand only — the operator asks their agent; nothing auto-runs.
+    REMIND = ("<p style='background:#f0f9ff;border-left:3px solid #0284c7;padding:6px 10px;"
+              "font-size:12px;color:#0c4a6e;margin:0 0 12px'>💡 Tip: ask your agent to find "
+              "warm-intro contacts for any role here before you apply.</p>")
     if upcoming:
-        h = [WRAP_OPEN,
+        h = [WRAP_OPEN, REMIND,
              "<h2 style='margin:0 0 4px'>🔔 Opening within 14 days — start referral outreach NOW</h2>",
              "<p style='color:#555;margin:0 0 14px'>Repeats daily until you tap <b>done</b>, or until the req posts "
              "and moves to your apply list. <b>find people</b> opens the LinkedIn search; it never clears the row.</p><ul>"]
@@ -442,7 +457,7 @@ def main():
 
     # ================= EMAIL #2 — DAILY APPLY LIST =================
     n_new = sum(1 for r in roles if r.get("_new"))
-    h = [WRAP_OPEN,
+    h = [WRAP_OPEN, REMIND,
          f"<h2 style='margin:0 0 6px'>📥 Your apply list — {len(roles)} open, none drop off until you tap "
          f"<span style='color:#666;font-weight:normal'>({n_new} ⭐new since yesterday)</span></h2>",
          "<p style='font-size:12px;margin:0 0 12px'>" + " ".join(badge(k) for k in
@@ -466,25 +481,64 @@ def main():
                      f"border-bottom:1px solid #ddd'>{bname} ({len(brows)})</td></tr>")
             for r in brows:
                 note = md(r.get("eligibility_note") or r.get("funding") or "")[:180]   # 20-word reasons need the room
+                # Why-matched (2026-08-15): the system's own reasons, already computed —
+                # cluster, tier, matched keywords. Deterministic, no model call. Lets a
+                # mis-scored row be spotted at a glance.
+                _kw = ", ".join(r.get("matched_keywords", [])[:3])
+                why = " · ".join(x for x in (r.get("cluster", ""), r.get("tier", ""), _kw) if x)
+                if why:
+                    note = f"<span style='color:#9ca3af;font-size:11px'>[{md(why)}]</span><br>{note}"
                 posted = r.get("posted_at") or datetime.fromtimestamp(r.get("ts", 0)).strftime("%m-%d") + "~"
                 star = "⭐ " if r.get("_new") else ""
                 nd = qs.days_shown(r, _shown)
                 # Sitting-here-N-days pressure. Silence would let a role rot quietly; this is
                 # what replaces the old 14-day auto-expiry.
                 age = (f"<span style='color:#b45309;font-size:11px'> · day {nd}</span>" if nd >= 1 else "")
+                # Pay when the board published it (Lever/Ashby/speedrun carry it; most don't).
+                pay = (f" · <span style='color:#059669'>{md(str(r.get('pay','')))[:24]}</span>"
+                       if r.get("pay") else "")
                 link = qs.relay(r.get("url", ""), r, _relay)
+                # 👍/👎 verdict buttons: relay taps with no destination — they log feedback
+                # and land on a confirmation page, never on the posting. 👍 marks the row;
+                # 👎 removes it tomorrow. Weekly, the taps train the matching (proposals only).
+                thumb = " 👍" if _verd.get(qs.job_id(r)) == "yes" else ""
+                ylink = qs.relay("", r, _relay, action="yes")
+                nlink = qs.relay("", r, _relay, action="no")
+                vbtns = ("" if not _relay else
+                         f"<br><a href='{ylink}' style='background:#059669;color:#fff;padding:1px 7px;"
+                         f"border-radius:4px;text-decoration:none;font-size:11px'>✓</a>&nbsp;"
+                         f"<a href='{nlink}' style='background:#dc2626;color:#fff;padding:1px 7px;"
+                         f"border-radius:4px;text-decoration:none;font-size:11px'>✗</a>")
                 h.append("<tr style='border-bottom:1px solid #eee'>"
                          f"<td>{badge(r.get('industry','startup_other'))}</td>"
                          f"<td>{star}<b>{r.get('score',0)}</b></td>"
-                         f"<td>{md(r.get('company',''))}</td>"
+                         f"<td>{md(r.get('company',''))}{thumb}</td>"
                          f"<td>{md(r.get('title',''))}{' 🔄' if r.get('offcycle') else ''}"
                          f"<br><span style='color:#888;font-size:11px'>{posted} · "
-                         f"{md(r.get('location',''))[:35]}</span>{age}</td>"
+                         f"{md(r.get('location',''))[:35]}{pay}</span>{age}</td>"
                          f"<td style='font-size:12px;color:#444'>{note}</td>"
-                         f"<td><a href='{link}' style='color:#1d4ed8'>apply→</a></td></tr>")
+                         f"<td><a href='{link}' style='color:#1d4ed8'>apply→</a>{vbtns}</td></tr>")
         h.append("</table>")
     else:
         h.append("<p>No fresh matches today.</p>")
+
+    # Weekly verdict patterns (2026-08-15): what the 👍/👎 taps imply, per the
+    # feedback_patterns joint. Proposals only — the operator applies any of them by
+    # telling their agent in a session; the digest never edits config. Shown while
+    # fresh (<8 days), then silent until the next analysis.
+    try:
+        _fpp = os.path.join(REPO_DIR, "data", "feedback_patterns.json")
+        _fp = json.load(open(_fpp)) if os.path.exists(_fpp) else {}
+        if _fp.get("proposals") and time.time() - _fp.get("ts", 0) < 8 * 86400:
+            h.append(f"<h3>🧠 What your taps say ({_fp.get('verdict_count', 0)} verdicts analyzed)</h3><ul>")
+            for p in _fp["proposals"][:7]:
+                h.append(f"<li><b>{md(p.get('pattern',''))}</b> "
+                         f"<span style='color:#888'>({md(p.get('evidence',''))})</span><br>"
+                         f"<i style='color:#0c4a6e'>Proposal: {md(p.get('proposal',''))}</i></li>")
+            h.append("</ul><p style='font-size:12px;color:#555'>To act on any of these, "
+                     "tell your agent — nothing is applied automatically.</p>")
+    except Exception as ex:
+        print(f"[warn] feedback patterns section skipped: {ex}")
 
     # funding radar + newsletters as compact intel sections
     try:

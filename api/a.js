@@ -15,7 +15,9 @@ export default async function handler(req, res) {
   // "undo" must be whitelisted or the Undo link below LOGS ANOTHER APPLY — shipped
   // that way until a 2026-08-10 cold audit traced k=undo into the coercion.
   // queue_state.py has handled "undo" all along.
-  const action = ["applied", "networked", "undo"].includes(k) ? k : "applied";
+  // "yes"/"no" are verdict taps (👍/👎 per row) — routed to feedback.jsonl by the
+  // Action, never to applied.jsonl: a verdict must not clear a row as if applied.
+  const action = ["applied", "networked", "undo", "yes", "no"].includes(k) ? k : "applied";
 
   try {
     await fetch(`https://api.github.com/repos/${process.env.GH_REPO}/dispatches`, {
@@ -50,6 +52,20 @@ function safeUrl(u) {
 }
 
 function page(j, action) {
+  // Verdict taps get their own copy + a flip link (last verdict wins downstream),
+  // NOT the undo link — k=undo would write an apply-undo for a row never applied to.
+  if (action === "yes" || action === "no") {
+    const yes = action === "yes";
+    const flip = yes ? "no" : "yes";
+    return `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
+<body style="font:16px -apple-system,sans-serif;padding:44px;max-width:34rem;margin:auto">
+<h2 style="margin:0 0 6px">Saved: ${yes ? "👍 more like this" : "👎 not for me"}</h2>
+<p style="color:#555;margin:0 0 22px">${yes
+    ? "The row stays on your list until you apply. Weekly, your taps train the matching."
+    : "This one stops showing tomorrow. Weekly, your taps train the matching."}</p>
+<a href="/api/a?j=${encodeURIComponent(j)}&k=${flip}"
+   style="color:#b45309;text-decoration:none">Tapped wrong? Mark ${yes ? "👎" : "👍"} instead</a></body>`;
+  }
   return `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
 <body style="font:16px -apple-system,sans-serif;padding:44px;max-width:34rem;margin:auto">
 <h2 style="margin:0 0 6px">Logged: ${action}</h2>

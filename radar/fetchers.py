@@ -5,6 +5,35 @@ from radar.settings import USER_AGENT
 
 UA = {"User-Agent": USER_AGENT}
 
+# ---- pay extraction (2026-08-15: show salary/hourly pay in the digest) ----
+# Deterministic only — no model call, no extra HTTP. Reads pay from what the ATS list
+# response already carries: Lever's salaryRange/descriptionPlain, Ashby's
+# compensationTierSummary, speedrun's comp_min/max. Greenhouse/Workday list endpoints
+# carry no pay, so those rows have none — blank means "board didn't publish it",
+# never "extraction silently died" (test_feedback.py holds a positive control).
+_PAY_HOURLY = re.compile(
+    r"(\$\d{1,3}(?:\.\d{2})?(?:\s*(?:[-–—~]|to)\s*\$?\d{1,3}(?:\.\d{2})?)?)\s*(?:/\s*|\bper\s+)(?:hr|hour)",
+    re.IGNORECASE)
+_PAY_ANNUAL = re.compile(
+    r"(\$\d{2,3},\d{3}(?:\s*(?:[-–—~]|to)\s*\$?\d{2,3},\d{3})?)")
+_PAY_K = re.compile(
+    r"(\$\d{2,3}\s?[kK](?:\s*(?:[-–—~]|to)\s*\$?\d{2,3}\s?[kK])?)")
+
+def extract_pay(text):
+    """Best-effort pay string from posting text: '$45–$55/hr' or '$120,000–$140,000/yr'.
+    Hourly checked first — intern comp is usually hourly and an hourly figure next to an
+    annualized range is the one an intern actually gets paid."""
+    if not text:
+        return ""
+    m = _PAY_HOURLY.search(text)
+    if m:
+        return re.sub(r"\s+", "", m.group(1)) + "/hr"
+    m = _PAY_ANNUAL.search(text) or _PAY_K.search(text)
+    if m:
+        return re.sub(r"\s+", "", m.group(1)) + "/yr"
+    return ""
+
+
 def _get(url, timeout=20, retries=3):
     """GET with backoff. Job boards rate-limit and time out routinely; without retries a single
     blip starts a false 'source went dark' streak (this is exactly what happened to Anduril on
@@ -48,9 +77,17 @@ def fetch_lever(company, org):
         if ts:
             import datetime as _dt
             posted = _dt.datetime.utcfromtimestamp(ts / 1000).strftime("%Y-%m-%d")
+        # Structured salaryRange first (pay-transparency postings carry it); regex over
+        # the plain description otherwise.
+        sr = j.get("salaryRange") or {}
+        if sr.get("min") and sr.get("max"):
+            unit = "/hr" if "hour" in str(sr.get("interval", "")).lower() else "/yr"
+            pay = f"${int(sr['min']):,}–${int(sr['max']):,}{unit}"
+        else:
+            pay = extract_pay(f"{j.get('descriptionPlain','')} {j.get('additionalPlain','')}")
         out.append({"company": company, "title": j["text"], "location": (j.get("categories") or {}).get("location", ""),
                     "url": j["hostedUrl"], "department": (j.get("categories") or {}).get("team", ""),
-                    "posted_at": posted, "source": f"lever:{org}"})
+                    "posted_at": posted, "pay": pay, "source": f"lever:{org}"})
     return out
 
 def fetch_workday(company, token):
@@ -120,6 +157,8 @@ def fetch_ashby(company, org):
     return [{"company": company, "title": j["title"], "location": j.get("location", ""),
              "url": j.get("jobUrl") or j.get("applyUrl", ""), "department": j.get("department", "") or j.get("team", ""),
              "posted_at": str(j.get("publishedAt") or j.get("publishedDate") or "")[:10],
+             # Ashby publishes a ready-made comp string when the employer opts in.
+             "pay": j.get("compensationTierSummary") or "",
              "source": f"ashby:{org}"} for j in data.get("jobs", [])]
 
 def fetch_substack(name, sub):
@@ -228,7 +267,10 @@ def fetch_speedrun(company="a16z speedrun network", pages=12):
                         "title": _pick(j, "title"),
                         "location": str(_pick(j, "location")),
                         "url": _pick(j, "url", "company_url"),
-                        "department": " ".join(x for x in (_pick(j, "function"), comp) if x),
+                        # comp moved out of department (2026-08-15): it now has a first-class
+                        # field; keeping it in department polluted keyword matching.
+                        "department": _pick(j, "function"),
+                        "pay": (comp + "/yr") if comp else "",
                         "posted_at": str(_pick(j, "published_at"))[:10],
                         "source": "speedrun"})
         if page >= data.get("total_pages", 0):

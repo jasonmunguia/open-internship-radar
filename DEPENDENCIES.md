@@ -39,7 +39,7 @@ unmeasured company stays `pending` (T4, silent) forever.
 **Claude Code CLI** (`claude`) —
 CAPABILITY: a coding agent with web search, invocable headlessly as a subprocess — the
 system's judgment layer, paid for by a subscription you already have. No API key.
-Load-bearing for: all five LLM joints (`radar/joints.py` is the registry and the ONLY door
+Load-bearing for: all six LLM joints (`radar/joints.py` is the registry and the ONLY door
 to the CLI; contracts live there).
 Get: https://claude.com/claude-code — then confirm `claude -p "Reply with exactly: OK"`
 prints OK. Expected at `~/.local/bin/claude` (joints.py falls back to `$PATH`).

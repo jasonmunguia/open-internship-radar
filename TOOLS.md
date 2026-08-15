@@ -59,7 +59,7 @@ than racing a file SHA.
 
 **SEC EDGAR** via the `free-apis` skill — Form D filings, the funding tier signal.
 
-## LLM joints — the five places a model is used, and the registry that enforces it
+## LLM joints — the six places a model is used, and the registry that enforces it
 
 **`radar/joints.py` is the registry and the only door to the CLI** — every joint's model,
 timeout and contract lives there, and `tests/test_joints.py` fails if a model call appears
@@ -81,6 +81,10 @@ surfaced a fifth the prose had missed — which is why the registry exists.)
 5. **source_heal** (`radar/self_heal.py`) — a source dark 3+ polls after automated repair
    failed: may edit only that source's entry in sources.yaml, must verify jobs return,
    never commits.
+6. **feedback_patterns** (`radar/feedback_analysis.py`) — weekly analysis of the ✓/✗
+   verdict taps joined to row facts (gated: ≥10 verdicts, ≥7-day span, new data only).
+   Returns pattern PROPOSALS rendered in the digest; never edits any file — applying a
+   proposal is the operator's call, made in conversation.
 
 Title-variant mining from `data/dropped_unmatched.jsonl` is MANUAL today: ask an agent to
 mine the local drop log; it PROPOSES patterns to a human and never auto-adds them. (No

@@ -83,12 +83,20 @@ def main():
         from radar.calendar_research import run
         return run()
 
+    def feedback():
+        # Weekly pattern analysis over the 👍/👎 taps. Runs every night but gates
+        # itself (min verdicts, min span, new-data-only), so most nights it reports
+        # a skip with its reason — the skip string IS the quality signal.
+        from radar.feedback_analysis import run
+        return run()
+
     # NOTE: no stage for portals that require someone's third-party credentials
     # (member networks, logged-in job boards). Excluded by design, not by omission —
     # a radar must never operate someone's account for them.
     for name, fn in [("funding", funding), ("tier_backfill", backfill),
                      ("slug_resolution", slugs), ("discovery", discovery),
-                     ("observed_opens", observed), ("calendar_research", calendar)]:
+                     ("observed_opens", observed), ("calendar_research", calendar),
+                     ("feedback_patterns", feedback)]:
         _stage(name, fn, report)
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)

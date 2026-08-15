@@ -51,6 +51,18 @@ JOINTS = {
         "contract": "may revise dates with a cited evidence URL; may not invent "
                     "programs; malformed output is a no-op, never a partial write",
     },
+    # Weekly verdict-pattern analysis (2026-08-15): reads a week of 👍/👎 digest taps
+    # joined to row facts and proposes what they imply. Needs web search for company
+    # context, so it gets exactly the two web tools and nothing else — narrower than
+    # the research joints above. Output is PROPOSALS ONLY; applying any of them to
+    # profile.yaml is the operator's call, made in conversation, never here.
+    "feedback_patterns": {
+        "model": "sonnet", "timeout": 900,
+        "argv_extra": ["--allowedTools", "WebSearch,WebFetch"],
+        "contract": "reads verdict rows joined to queue facts; returns pattern proposals "
+                    "as JSON, each citing its evidence rows; may web-search company "
+                    "context; never edits any file; malformed output is a no-op",
+    },
     # Not in the original four-joint sketch — found while building this registry, which is the point.
     "source_heal": {
         "model": "sonnet", "timeout": 900,

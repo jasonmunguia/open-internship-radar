@@ -6,7 +6,7 @@ Read `AGENT_ONBOARDING.md` instead if your job is setting this up for a person.
 ## What this system is
 A deterministic pipeline that finds early-career roles and emails three things: a
 pre-network heads-up, a daily apply queue, and instant alerts. A model is used at exactly
-FIVE joints and nowhere else — `radar/joints.py` is the registry, the only door to the
+SIX joints and nowhere else — `radar/joints.py` is the registry, the only door to the
 CLI, and the answer to "where does this system use judgment?". `tests/test_joints.py`
 fails the moment a model call appears outside it. (The registry earned its keep the day it
 was written: building it surfaced a fifth joint, `source_heal`, that every prose inventory
@@ -82,7 +82,7 @@ same commit.
   public. Used by tiers/fetch/local_scrape. Use when a fetch returns 403/JS-shell, when
   scoping any enrichment task, when a vendor wants money for public data.
 - **Claude Code CLI** — headless judgment with web search on an existing subscription; the
-  five joints. Any coding-agent CLI honoring the contracts in `joints.py` substitutes.
+  six joints. Any coding-agent CLI honoring the contracts in `joints.py` substitutes.
 - **mailer** (shipped: `tools/mailer.py`) — headless SMTP as a SPECIFIC named account,
   Keychain-stored password; works from launchd where no MCP exists. Never send as the
   unspecified default — it may be a work mailbox.
@@ -104,7 +104,15 @@ digest done: nothing sent                                                  ← a
 An agent that cannot recognise a broken run will report success. When in doubt, compare
 today's log to these shapes before believing either the log or yourself.
 
-## Two checkouts
+## Two checkouts — and a third deploy surface
 The checkout your launchd jobs point at (conventionally `~/.internship-radar`) is production. Dev clones are separate. Merging to
 main deploys nothing until production pulls (`cd ~/.internship-radar && git pull`).
 `digest.py` self-heals this each run; never rely on that while verifying a change.
+
+The Vercel click relay (`api/a.js`) is the third surface and the easiest to forget:
+unless the Vercel project is GitHub-linked, pushing to main deploys NOTHING there — run
+`vercel --prod --yes` from the repo after any `api/` change (2026-08-15: the verdict-
+button deploy sat 6 days behind main until this was caught). A stale relay is not
+cosmetic — it coerces unknown `k=` actions to "applied", so new link types written
+against a newer relay silently log APPLICATIONS until the deploy lands. Verify by
+curling the relay and checking the response copy matches HEAD, never by trusting the push.

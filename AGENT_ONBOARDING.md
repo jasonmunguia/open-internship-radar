@@ -35,7 +35,7 @@ failed; fix them before proceeding.
   to zero; burning alerts are time-critical only).
 - THE CONTRACT: a role ships iff title matches a role family AND company is T3+. Both.
   Nothing else decides. The LLM removes the impossible; it never expresses preference.
-- The five LLM joints, each one's contract, and where they live (`radar/joints.py`).
+- The six LLM joints, each one's contract, and where they live (`radar/joints.py`).
 - What runs in the cloud (poll, alerts, click relay, watchdog) vs on the machine
   (digest, scrape, nightly enrichment) — and why (a laptop is closed most of the time;
   the LLM rides a local subscription, not an API key).

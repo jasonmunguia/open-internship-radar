@@ -44,6 +44,17 @@ does it well, and stays out of the rest.
 - **Apply queue** — everything open you have not applied to, grouped Today / This week / Last week
   / This month. Tap a link and it never appears again. Do not tap it and it never disappears — it
   accrues a visible day counter instead.
+  - **✓ / ✗ buttons** (green/red, next to apply→) are taste verdicts, not queue actions: logged
+    to `data/feedback.jsonl`, never to `applied.jsonl`. **✗** hides the row from tomorrow on (a
+    tap is a tap); **✓** marks it 👍 and keeps it until you apply. Mis-tap? The confirmation page
+    has a flip link — the last tap wins. Once ≥10 verdicts span ≥7 days, the nightly
+    `feedback_patterns` joint analyzes them (with web search) and the digest shows a "What your
+    taps say" section — **proposals only**; tell your agent to apply any of them, nothing edits
+    `profile.yaml` on its own.
+  - **Pay** shows in green in the row sub-line when the board publishes it (Lever/Ashby/speedrun
+    do; Greenhouse/Workday list APIs don't) — blank means unpublished, not broken. The gray
+    `[cluster · tier · keywords]` line is why the row matched, from the system's own scoring —
+    a mis-scored row should look wrong there at a glance.
 - **Burning alert** — anything above threshold within one poll cycle, after verifying the posting
   is still live.
 
@@ -71,7 +82,7 @@ GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
 ```
 
 **Deterministic spine, LLM at the joints.** Fetching, parsing, scoring, and delivery are plain
-code — same input, same output, debuggable, free. A model is invoked at exactly five registered joints (`radar/joints.py` — enforced by
+code — same input, same output, debuggable, free. A model is invoked at exactly six registered joints (`radar/joints.py` — enforced by
 `tests/test_joints.py`) where the alternative would be a heuristic that is wrong. Full reasoning in `METHODOLOGY.md` §2.
 
 ---

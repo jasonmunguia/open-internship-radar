@@ -270,7 +270,11 @@ def main():
     # Rows scored before a gate existed stay in the queue forever otherwise. Re-checking every
     # run means a rule change retroactively cleans history with no manual purge.
     if os.path.exists(QUEUE):
-        kept_rows, dropped_foreign = [], 0
+        from radar.score import _any
+        _gates = profile["scoring"]["gate_patterns"]
+        _excl = profile["scoring"].get("exclude_patterns", [])
+        _relic_log = os.path.join(ROOT, "data", "dropped_relics.jsonl")
+        kept_rows, dropped_foreign, dropped_relic = [], 0, 0
         for line in open(QUEUE):
             try:
                 row = json.loads(line)
@@ -280,11 +284,27 @@ def main():
                     row.get("location", ""), row.get("department", "")):
                 dropped_foreign += 1
                 continue
+            # Gate-relic purge (2026-08-15): rows scored under OLD gate patterns stay
+            # queued forever otherwise — bare 'intern' matched inside 'International'
+            # until the 08-14 word-boundary fix, and a full-time "Product Manager |
+            # International" topped the email a day AFTER the gate was fixed. Re-check
+            # against CURRENT patterns. Caveat: scoring saw the description, the queue
+            # row doesn't carry it — so a row gated in via description alone would be
+            # dropped here. Every drop is therefore LOGGED to dropped_relics.jsonl
+            # (never silent), same posture as dropped_unmatched.jsonl.
+            if row.get("cluster") != "newsletter":
+                _rowtext = " ".join(str(row.get(k, "")) for k in ("title", "department", "location"))
+                if not _any(_gates, _rowtext) or _any(_excl, row.get("title", "")):
+                    dropped_relic += 1
+                    with open(_relic_log, "a") as rl:
+                        rl.write(json.dumps(row) + "\n")
+                    continue
             kept_rows.append(json.dumps(row) + "\n")
-        if dropped_foreign:
+        if dropped_foreign or dropped_relic:
             with open(QUEUE, "w") as q:
                 q.writelines(kept_rows)
-            print(f"[self-heal] removed {dropped_foreign} non-US rows from the queue")
+            print(f"[self-heal] removed {dropped_foreign} non-US rows, "
+                  f"{dropped_relic} gate-relic rows (logged to dropped_relics.jsonl)")
 
     # ---- pruning: keep seen/queue bounded to a 90-day window so the repo never bloats over years ----
     RETAIN = 90 * 86400

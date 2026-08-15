@@ -13,6 +13,7 @@ from datetime import date, datetime
 
 APPLIED = os.path.join(os.path.dirname(__file__), "..", "data", "applied.jsonl")
 SHOWN = os.path.join(os.path.dirname(__file__), "..", "data", "shown.json")
+FEEDBACK = os.path.join(os.path.dirname(__file__), "..", "data", "feedback.jsonl")
 
 
 def job_id(row):
@@ -38,6 +39,18 @@ def acted_ids(action=None):
     for r in _read_jsonl(APPLIED):
         state[r.get("job_id")] = r.get("action")
     return {k for k, v in state.items() if v not in (None, "undo") and (action is None or v == action)}
+
+
+def verdicts():
+    """job_id -> "yes"/"no" from the 👍/👎 taps. Replayed in file order, last verdict
+    wins — the flip link on the relay's confirmation page is the mis-tap recovery, so
+    a later tap must supersede an earlier one. A "no" hides the row from the digest;
+    a "yes" only marks it. Both feed the weekly pattern analysis."""
+    state = {}
+    for r in _read_jsonl(FEEDBACK):
+        if r.get("action") in ("yes", "no") and r.get("job_id"):
+            state[r["job_id"]] = r["action"]
+    return state
 
 
 def load_shown():
