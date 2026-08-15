@@ -82,6 +82,45 @@ def _ssl_context():
         return ssl.create_default_context(cafile=cf)
     return ssl.create_default_context()
 
+def _plain_text(msg):
+    """First text/plain part, decoded. Empty string when the message has none."""
+    parts = msg.walk() if msg.is_multipart() else [msg]
+    for p in parts:
+        if p.get_content_type() == "text/plain":
+            raw = p.get_payload(decode=True) or b""
+            return raw.decode(p.get_content_charset() or "utf-8", "replace")
+    return ""
+
+def search_inbox(account, subject_token, since_ts=0):
+    """Messages in `account`'s INBOX whose Subject contains subject_token (must be
+    plain ASCII — IMAP SUBJECT search does not see RFC2047-encoded words). Same
+    Keychain app password as SMTP. Read-only: BODY.PEEK leaves unread flags alone.
+    Returns [{from, subject, ts, text}] oldest-first."""
+    import email as _email
+    import imaplib
+    from email.utils import parsedate_to_datetime
+    addr = resolve(account)
+    pw = get_password(account)
+    out = []
+    with imaplib.IMAP4_SSL("imap.gmail.com", 993, ssl_context=_ssl_context()) as im:
+        im.login(addr, pw)
+        im.select("INBOX", readonly=True)
+        typ, data = im.search(None, "SUBJECT", f'"{subject_token}"')
+        for num in (data[0].split() if typ == "OK" and data and data[0] else []):
+            typ, md = im.fetch(num, "(BODY.PEEK[])")
+            if typ != "OK" or not md or not md[0]:
+                continue
+            msg = _email.message_from_bytes(md[0][1])
+            try:
+                ts = int(parsedate_to_datetime(msg["Date"]).timestamp())
+            except (TypeError, ValueError):     # absent or malformed Date header
+                ts = 0
+            if ts < since_ts:
+                continue
+            out.append({"from": msg.get("From", ""), "subject": msg.get("Subject", ""),
+                        "ts": ts, "text": _plain_text(msg)})
+    return sorted(out, key=lambda r: r["ts"])
+
 def send(account, to, subject, html, text=None, cc=None):
     """Send AS `account` (friendly name or address). Returns the sender address on success."""
     addr = resolve(account)

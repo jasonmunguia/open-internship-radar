@@ -93,10 +93,18 @@ def main():
     # NOTE: no stage for portals that require someone's third-party credentials
     # (member networks, logged-in job boards). Excluded by design, not by omission —
     # a radar must never operate someone's account for them.
+    def learning():
+        # Weekly learning check-in email + daily follow-up until the operator replies;
+        # replies are read over IMAP and fed back into the pattern analysis.
+        # Runs AFTER feedback so a fresh weekly analysis ships in the same night's
+        # check-in instead of a week-stale one.
+        from radar.learning_loop import run
+        return run()
+
     for name, fn in [("funding", funding), ("tier_backfill", backfill),
                      ("slug_resolution", slugs), ("discovery", discovery),
                      ("observed_opens", observed), ("calendar_research", calendar),
-                     ("feedback_patterns", feedback)]:
+                     ("feedback_patterns", feedback), ("learning_loop", learning)]:
         _stage(name, fn, report)
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)

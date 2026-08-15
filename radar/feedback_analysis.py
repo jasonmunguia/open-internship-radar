@@ -24,6 +24,7 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 FEEDBACK = os.path.join(ROOT, "data", "feedback.jsonl")
 QUEUE = os.path.join(ROOT, "data", "queue.jsonl")
 OUT = os.path.join(ROOT, "data", "feedback_patterns.json")
+REPLIES = os.path.join(ROOT, "data", "feedback_replies.jsonl")   # learning_loop check-in replies
 
 MIN_VERDICTS = 10
 MIN_SPAN_DAYS = 7
@@ -77,8 +78,10 @@ def run():
             prev = json.load(open(OUT))
         except Exception:
             prev = {}
-    if prev.get("verdict_count") == len(joined):
-        return "skip: no new verdicts since last analysis"
+    replies = _read_jsonl(REPLIES)
+    if (prev.get("verdict_count") == len(joined)
+            and prev.get("reply_count", 0) == len(replies)):
+        return "skip: no new verdicts or check-in replies since last analysis"
 
     prompt = (
         "You are analyzing a week+ of thumbs-up/thumbs-down verdicts a candidate gave on "
@@ -86,13 +89,24 @@ def run():
         "facts (tier T1 best..T4, score 0-100 is the system's own fit guess).\n\n"
         f"{json.dumps(joined, indent=1)}\n\n"
         "Find the patterns their verdicts reveal, especially where they DISAGREE with the "
-        "system's score/tier. Web-search a company only when its name alone is ambiguous. "
+        "system's score/tier. Focus PRIMARILY on the rejections — the 'no' verdicts are "
+        "the correction signal; a 'yes' only confirms what already ships. Web-search a "
+        "company only when its name alone is ambiguous. "
         "Reply with ONLY a JSON array (no prose, no fences), each element:\n"
-        '{"pattern": "<one sentence>", "evidence": "<counts, e.g. 0/6 yes on defense T3+>", '
+        '{"pattern": "<one sentence>", "polarity": "no"|"yes"|"mixed", '
+        '"evidence": "<counts, e.g. 0/6 yes on defense T3+>", '
         '"proposal": "<the single config/scoring change this suggests>"}\n'
-        "3-7 elements. Omit anything with fewer than 3 supporting verdicts. An empty "
-        "array is a valid answer."
+        "3-7 elements, most of them polarity \"no\". Omit anything with fewer than 3 "
+        "supporting verdicts. An empty array is a valid answer."
     )
+    if replies:
+        guidance = [{"date": time.strftime("%Y-%m-%d", time.localtime(g.get("ts", 0))),
+                     "their_words": g.get("text", "")} for g in replies[-3:]]
+        prompt += (
+            "\n\nThe candidate has ALSO replied to earlier learning check-ins in their own "
+            "words. Weight this explicit guidance ABOVE anything inferred from taps — "
+            "an inferred pattern that contradicts it is wrong:\n"
+            + json.dumps(guidance, indent=1))
     try:
         r = run_joint("feedback_patterns", prompt)
     except Exception as ex:
@@ -105,8 +119,9 @@ def run():
         assert isinstance(proposals, list)
     except Exception:
         return "malformed output (unparseable JSON) — no-op"
-    json.dump({"ts": int(time.time()), "verdict_count": len(joined),
-               "proposals": proposals}, open(OUT, "w"), indent=1)
+    with open(OUT, "w") as fh:
+        json.dump({"ts": int(time.time()), "verdict_count": len(joined),
+                   "reply_count": len(replies), "proposals": proposals}, fh, indent=1)
     return f"ok: {len(proposals)} proposals from {len(joined)} verdicts"
 
 

@@ -88,7 +88,8 @@ def test_gate_no_new_verdicts(monkeypatch):
         monkeypatch.setattr(feedback_analysis, "FEEDBACK", fb)
         monkeypatch.setattr(feedback_analysis, "QUEUE", os.path.join(td, "queue.jsonl"))
         monkeypatch.setattr(feedback_analysis, "OUT", out)
-        assert feedback_analysis.run() == "skip: no new verdicts since last analysis"
+        monkeypatch.setattr(feedback_analysis, "REPLIES", os.path.join(td, "replies.jsonl"))
+        assert feedback_analysis.run() == "skip: no new verdicts or check-in replies since last analysis"
 
 
 if __name__ == "__main__":
