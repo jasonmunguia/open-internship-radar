@@ -58,6 +58,34 @@ does it well, and stays out of the rest.
 - **Burning alert** — anything above threshold within one poll cycle, after verifying the posting
   is still live.
 
+**A fourth email, and the only way the radar's taste changes.** The three above push work at
+you; this one pulls correction back.
+
+Once your taps have accumulated (≥10 verdicts spanning ≥7 days), a weekly **learning
+check-in** emails what the system thinks it has learned — **rejections first**, because a ✗
+is the correction signal while a ✓ only confirms what already ships. Each pattern carries
+its evidence count and the single config change it would suggest.
+
+Then it waits. **Reply in plain English** — "stop showing me insurance", "no unpaid roles" —
+and your reply is read back over IMAP, quoted text stripped, and fed into every future
+pattern run *weighted above anything the system inferred on its own*. Until you reply it
+sends one follow-up per **calendar day** (not per 24 elapsed hours, or a check-in sent in
+the evening silently skips a day). Replying is the only thing that stops it.
+
+Two properties worth knowing before trusting it:
+
+- **Proposals only, by design.** Nothing here edits `profile.yaml`. Do not add that:
+  inbound email is spoofable, so a parse-and-apply path hands a config-write primitive to
+  anyone able to forge a message to the mailbox.
+- **An IMAP outage withholds the nudge instead of sending it blind.** If the inbox cannot
+  be read, the system cannot know whether you replied — and nagging someone who already
+  answered is worse than a quiet day.
+
+*Success looks like:* the nightly's `learning_loop` stage always printing one of `weekly
+check-in sent` / `awaiting reply…` / `follow-up #N sent` / `reply received … ingested` —
+never silence — and `data/feedback_replies.jsonl` growing over time. Empty after weeks of
+check-ins means the loop is emailing into the void.
+
 **Warm intros (optional, the banner in every email points here).** The radar's two levers are
 applying early and applying with a referral; the emails handle the first, this handles the second.
 The play: before applying, find someone the hiring company already trusts who is one hop from
