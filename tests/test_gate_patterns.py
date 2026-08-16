@@ -1,16 +1,13 @@
-"""Regression tests for the eligibility gate patterns.
+"""Regression tests for the eligibility gate patterns in config/profile.yaml.
 
-The bug this guards against: a bare "intern" gate pattern is a substring regex, so
-it matched inside "internAtional" and "internAl" — any posting whose title or
-description mentioned "international" sailed through the intern gate and landed in
-the operator's inbox. The gate must match intern/interns/internship(s) as whole
-words and NOTHING longer.
+The bug this guards against (found 2026-08-14): a bare "intern" gate pattern is a
+substring regex, so it matched inside "internAtional" and "internAl" — any posting
+whose title or description mentioned "international" sailed through the intern gate
+and landed in the operator's inbox. The gate must match intern/interns/internship(s) as
+whole words and NOTHING longer.
 
 Cluster patterns ending in "... intern" had the same class of bug ("solutions intern"
 matched "solutions international"), so those are checked too.
-
-Loads config/profile.yaml if the radar is configured, else the shipped example —
-so the guard runs on a fresh, unconfigured clone too.
 
 Run locally:  python3 -m tests.test_gate_patterns
 """
@@ -20,6 +17,8 @@ import yaml
 from radar.score import _any
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Loads config/profile.yaml if the radar is configured, else the shipped example — so
+# this guard runs in a fresh clone too, where only the example exists.
 _PROFILE = os.path.join(_ROOT, "config", "profile.yaml")
 if not os.path.exists(_PROFILE):
     _PROFILE = os.path.join(_ROOT, "config", "profile.example.yaml")
@@ -85,14 +84,20 @@ def main():
 
     total = len(MUST_PASS) + len(MUST_REJECT) + len(CLUSTER_MUST_REJECT) + len(CLUSTER_MUST_PASS)
     if failures:
-        print(f"❌ gate patterns FAILED — {len(failures)}/{total} cases wrong "
-              f"(profile: {os.path.basename(_PROFILE)}):")
+        print(f"❌ gate patterns FAILED — {len(failures)}/{total} cases wrong:")
         for f in failures:
             print("   ", f)
         sys.exit(1)
-    print(f"✅ gate patterns OK — {total}/{total} cases correct "
-          f"(profile: {os.path.basename(_PROFILE)})")
+    print(f"✅ gate patterns OK — {total}/{total} cases correct")
+
+
+def test_all():
+    """Pytest-visible wrapper — CI runs main() as a module step; without this,
+    pytest collects ZERO tests from this file and 'pytest tests/' reports a
+    passing suite that never ran these cases."""
+    main()
 
 
 if __name__ == "__main__":
+
     main()

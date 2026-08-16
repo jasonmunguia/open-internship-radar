@@ -72,7 +72,7 @@ def test_reply_ingested_and_loop_stops(monkeypatch):
     _tmp(monkeypatch)
     sent = _capture_send(monkeypatch)
     ll.run(NOW)
-    reply = {"ts": NOW + 3600, "from": "Operator <op@example.edu>", "token": "LRN-x",
+    reply = {"ts": NOW + 3600, "from": "the operator <j@example.edu>", "token": "LRN-x",
              "text": "drop all defense below T2"}
     monkeypatch.setattr(ll, "check_reply", lambda aw: reply)
     assert ll.run(NOW + 7200).startswith("reply received")

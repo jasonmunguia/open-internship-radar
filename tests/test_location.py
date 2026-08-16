@@ -74,5 +74,13 @@ def main():
         sys.exit(1)
     print(f"✅ location gate OK — {total}/{total} cases correct")
 
+def test_all():
+    """Pytest-visible wrapper — CI runs main() as a module step; without this,
+    pytest collects ZERO tests from this file and 'pytest tests/' reports a
+    passing suite that never ran these cases."""
+    main()
+
+
 if __name__ == "__main__":
+
     main()

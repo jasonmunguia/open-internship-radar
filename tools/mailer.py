@@ -20,8 +20,8 @@ SERVICE = "gmail-app-password"
 
 DEFAULT_ACCOUNTS = {
     "personal": "you@gmail.com",
-    "school": "you@example.edu",
-    "work": "you@yourcompany.com",   # NEVER send a job search from this one
+    "edu": "you@example.edu",
+    "synphony": "you@yourcompany.com",
 }
 
 def _load():

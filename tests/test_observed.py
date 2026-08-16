@@ -1,4 +1,4 @@
-"""Regression tests for observed_opens (spec item 8b: observed ground truth).
+"""Regression tests for observed_opens (NEXT.md item 8b).
 
 The matcher's first live probe (2026-08-09) produced 14 phantom matches because 'cia',
 'dia', 'nsa' and 'meta' are substrings of unrelated company names. Those phantoms are
