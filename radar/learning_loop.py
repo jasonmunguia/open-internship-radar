@@ -34,9 +34,21 @@ PATTERNS = os.path.join(ROOT, "data", "feedback_patterns.json")
 REPLIES = os.path.join(ROOT, "data", "feedback_replies.jsonl")
 
 WEEKLY_EVERY = 7 * 86400 - 2 * 3600     # slack for launchd schedule drift
-FOLLOWUP_EVERY = 22 * 3600              # nightly cadence, minus the same drift
+
+# "Daily" means a NEW CALENDAR DAY, not 24 elapsed hours. An elapsed-time threshold
+# silently skips a day whenever the check-in lands after the nightly's hour: sent 16:56,
+# the 02:10 nightly is only 9h later, so a 22h gate holds — and the first nudge arrives
+# 33h after the ask instead of the next morning. Comparing local dates makes the cadence
+# independent of what time of day the check-in went out.
 
 _POLARITY_ORDER = {"no": 0, "mixed": 1, "yes": 2}
+
+
+def _day(ts):
+    """Local calendar date of a timestamp, as an ordinal for cheap comparison.
+    Local, not UTC, deliberately: "daily" has to mean his day, and a UTC date would
+    roll over mid-evening Pacific."""
+    return time.localtime(ts or 0).tm_yday + time.localtime(ts or 0).tm_year * 1000
 
 
 def _state():
@@ -156,7 +168,7 @@ def run(now=None):
             st["last_reply_ts"] = reply["ts"] or now
             _save_state(st)
             return f"reply received for {reply['token']} ({len(reply['text'])} chars) — ingested"
-        if now - aw.get("last_contact_ts", 0) >= FOLLOWUP_EVERY:
+        if _day(now) > _day(aw.get("last_contact_ts", 0)):
             token, subject, body = compose(now)
             days = max(1, (now - aw["sent_ts"]) // 86400)
             body = (f"<p><i>Day {days} without a reply — same question, standing nudge. "

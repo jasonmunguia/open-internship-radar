@@ -62,10 +62,24 @@ def test_daily_followup_until_reply(monkeypatch):
     sent = _capture_send(monkeypatch)
     monkeypatch.setattr(ll, "check_reply", lambda aw: None)
     ll.run(NOW)
-    assert ll.run(NOW + 23 * 3600).startswith("follow-up #1")
-    assert ll.run(NOW + 46 * 3600).startswith("follow-up #2")
+    assert ll.run(NOW + 26 * 3600).startswith("follow-up #1")     # next calendar day
+    assert ll.run(NOW + 50 * 3600).startswith("follow-up #2")     # the day after
     assert len(sent) == 3
     assert "Day 1" in sent[1][1] and sent[1][0].startswith("Re: ")
+
+
+def test_followup_fires_next_morning_not_24h_later(monkeypatch):
+    """The cadence bug this guards: a check-in sent at 16:56 with a 22h elapsed-time
+    gate would hold at the 02:10 nightly (only 9h later) and not nudge until the
+    following night — 33h after the ask, skipping a day he expected to hear on."""
+    _tmp(monkeypatch)
+    _capture_send(monkeypatch)
+    monkeypatch.setattr(ll, "check_reply", lambda aw: None)
+    import time as _t
+    evening = int(_t.mktime(_t.strptime("2026-08-15 16:56", "%Y-%m-%d %H:%M")))
+    next_nightly = int(_t.mktime(_t.strptime("2026-08-16 02:10", "%Y-%m-%d %H:%M")))
+    ll.run(evening)
+    assert ll.run(next_nightly).startswith("follow-up #1")
 
 
 def test_reply_ingested_and_loop_stops(monkeypatch):
