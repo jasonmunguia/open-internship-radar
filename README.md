@@ -178,4 +178,4 @@ and you should replace them with your own. Several components have run for days,
 
 Issues and PRs welcome, particularly source additions with a live probe result attached.
 
-MIT.
+Apache-2.0 — free to use, fork and build on, **with credit**. Keep the `NOTICE` file.
