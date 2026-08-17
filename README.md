@@ -5,6 +5,9 @@ finds against role families and company caliber, and emails you three things: **
 (so you can network before the posting exists), **what is open now** (as a queue you work to zero,
 not a feed you skim), and **anything urgent, within the hour**.
 
+Built by [Jason Munguia](https://github.com/jasonmunguia). Apache-2.0 — free to use, fork and build on, **with credit**.
+
+
 It runs on **your own LLM subscription** — no API keys, no per-token cost, no vendor account. The
 deterministic parts run free in GitHub Actions whether your laptop is open or not.
 
