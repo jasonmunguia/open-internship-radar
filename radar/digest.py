@@ -31,7 +31,7 @@ from radar.settings import REPO, TO_ADDR, SEND_AS, WORK_DOMAINS, MENTION, RELAY_
 
 import base64
 import re as _re
-from radar.score import is_us_location
+from radar.score import is_us_location, score_posting
 from email.message import EmailMessage
 
 # Named channel in ~/.claude/tools/mailer.py (app password in macOS Keychain).
@@ -260,6 +260,42 @@ def _sent_today():
         return False
 
 
+DISPLAY_FLOOR = 55          # apply-list score floor (fit >=55)
+PASSING_TIERS = ("T1", "T2", "T3", "funded")   # the ONLY tiers allowed to ship (funded = stage+recency rule)
+
+
+def rescore_and_partition(rows, profile, funded, tier_cache):
+    """Re-score rows with the CURRENT rules and split into (passing, unverified).
+
+    Exists because queue.jsonl keeps each row's ingest-time score forever: rows scored
+    under retired rules (unknown tier once earned +10) were resurfacing at 58 — a score
+    unreachable under today's arithmetic — which is how unknown-company jobright rows
+    shipped for weeks. Pure function, cache-only (no network, no model): band_for is
+    called with allow_fetch=False via score_posting.
+
+    passing   = score >= DISPLAY_FLOOR and tier in PASSING_TIERS (T1-T3 or funded)
+    unverified = tier is unknown/T4 but the row WOULD clear the floor if the company
+                 proved T1 (score + 40 >= floor) — MUST NOT ship until a resolution
+                 pass (Scrapling backfill / slug_resolve joint) bands it. The floor is
+                 checked against best-case tier, not current: an unknown company at 40
+                 is exactly the row the resolver exists to settle, not one to drop.
+    """
+    from radar.tiers import BAND_POINTS
+    passing, unverified = [], []
+    for r in rows:
+        s, brief = score_posting(r, profile, funded, tier_cache=tier_cache)
+        if s is None:
+            continue
+        r["score"] = s
+        r.update(brief)
+        if brief["tier"] in PASSING_TIERS:
+            if s >= DISPLAY_FLOOR:
+                passing.append(r)
+        elif s + BAND_POINTS[1] >= DISPLAY_FLOOR:
+            unverified.append(r)
+    return passing, unverified
+
+
 def main():
     # A DRY run must be READ-ONLY beyond /tmp: it used to sync (or clone!) production,
     # advance last_ts (destroying tomorrow's ⭐ markers), start day-N clocks in
@@ -315,14 +351,16 @@ def main():
             print(f"[warn] rescue eligibility filter unavailable: {ex}")
 
     # STANDING apply list: every role currently open <=fresh_days, fit >=55, deduped by company+title.
-    display_floor = 55
+    # NOTE the stored score is NOT trusted here — the tier gate below re-scores every
+    # candidate with the current rules, so a stale ingest-time score can neither ship a
+    # row (old inflated 58s) nor hide one (a company whose tier improved since ingest).
     seen_ct, roles = set(), []
     for r in allrows:
         # gov/usajobs are NO LONGER dropped (2026-08-08): IC + cleared roles are a T1 target.
         # Only newsletter rows are excluded here — they are leads, not postings.
         if r.get("cluster") == "newsletter":
             continue
-        if r.get("score", 0) < display_floor or not within_days(r, fresh_days):
+        if not within_days(r, fresh_days):
             continue
         # US-only. Belt-and-braces: catches rows scored before the location gate existed.
         if not is_us_location(r.get("location", ""), r.get("department", "")):
@@ -344,6 +382,43 @@ def main():
     # still has to apply) and marks it. Mis-taps recover via the flip link, last tap wins.
     _verd = qs.verdicts()
     roles = [r for r in roles if _verd.get(qs.job_id(r)) != "no"]
+
+    # ---- TIER GATE (2026-08-22 per the operator): every apply recommendation must be T1-T3 ----
+    # (or freshly funded). Three layers, in order:
+    #   1) re-score with current rules (kills stale queue scores — see rescore_and_partition)
+    #   2) unknown-tier survivors get a LIVE resolution pass: Scrapling backfill first
+    #      (deterministic), then the slug_resolve Claude joint on what it could not band
+    #   3) still-unknown rows are HELD OUT of the email — nothing ships unverified. If the
+    #      resolution machinery itself failed while rows were waiting on it, DEFER the
+    #      send (defer-don't-degrade, 18:00 backstop) — a held row is a verified rejection
+    #      only when the resolver actually ran.
+    from radar.poll import load_funded as _load_funded
+    from radar.tiers import load_cache as _load_tier_cache
+    _funded = _load_funded()
+    _tcache = _load_tier_cache()
+    roles, _unverified = rescore_and_partition(roles, profile, _funded, _tcache)
+    if _unverified and not DRY:
+        _res_err = None
+        try:
+            from radar.tiers import backfill as _tier_backfill, resolve_unresolved_with_claude as _tier_claude
+            _tier_backfill([r["company"] for r in _unverified], cache=_tcache,
+                           limit=int(os.environ.get("IR_DIGEST_BACKFILL_LIMIT", "40")))
+            _res_err = (_tier_claude() or {}).get("error")
+        except Exception as ex:
+            _res_err = f"{type(ex).__name__}: {ex}"[:120]
+        _tcache = _load_tier_cache()   # both resolvers persist to the cache file
+        _rescued, _unverified = rescore_and_partition(_unverified, profile, _funded, _tcache)
+        roles += _rescued
+        if _res_err and _unverified and datetime.now().hour < 18:
+            print(f"[defer] tier gate: resolver failed ({_res_err}) with {len(_unverified)} rows unverified — not sending")
+            _mark_deferred(f"tier resolver failed with {len(_unverified)} rows unverified: {_res_err}")
+            return
+    if _unverified:
+        # Quality signal (no silent caps): every held row is named in the log.
+        print(f"[tier-gate] held {len(_unverified)} unknown/T4 rows out of the email: "
+              + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _unverified[:15])
+              + ("" if len(_unverified) <= 15 else f" … +{len(_unverified) - 15} more"))
+
     _shown = qs.mark_shown(roles) if not DRY else {}   # mark_shown writes shown.json + Wayback
     _relay = RELAY_BASE                                # unset -> raw links, never dead links
 
