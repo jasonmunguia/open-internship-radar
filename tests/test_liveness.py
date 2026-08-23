@@ -113,3 +113,12 @@ def test_sweep_unknown_row_is_held_offline(tmp_path, monkeypatch):
     monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
     live, dead, unsure, q = sweep([_row()], allow_network=False)
     assert live == [] and unsure and q["checked"] == 0
+
+
+def test_sweep_unlinked_row_is_dead_not_held(tmp_path, monkeypatch):
+    """A '#' or blank URL (board parse artifact) can never be verified or applied to —
+    it must die once, not retry forever (Medtronic '#' held daily until 2026-08-22)."""
+    monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
+    rows = [_row("Medtronic", url="#"), _row("Palantir Launch", url="")]
+    live, dead, unsure, _q = sweep(rows, allow_network=False)
+    assert live == [] and unsure == [] and len(dead) == 2

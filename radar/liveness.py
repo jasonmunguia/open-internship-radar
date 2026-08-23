@@ -2,7 +2,7 @@
 
 WHY THIS EXISTS (2026-08-22, per the operator): the queue never expires by age — rows leave
 when tapped — so a role could sit for weeks, die at the source, and still be
-recommended every morning. The operator tapped through a digest and found expired postings.
+recommended every morning. He tapped through a digest and found expired postings.
 "Still live" is now a claim that must carry proof, checked before EVERY send: a live
 verdict expires after LIVE_TTL_H hours, so no email ever leans on yesterday's check.
 
@@ -195,6 +195,13 @@ def sweep(rows, allow_network=True):
     live, dead, unsure, to_check = [], [], [], []
     for r in rows:
         jid = job_id(r)
+        u = str(r.get("url", "") or "")
+        if not u.startswith("http"):
+            # A row with no real link ('#', blank — board parse artifacts) can never be
+            # verified OR applied to; retrying it daily is a permanent hold. Dead, once.
+            cache[jid] = {"status": "dead", "ts": int(now), "url": u, "why": "no-url"}
+            dead.append(r)
+            continue
         v = cache.get(jid) or {}
         if v.get("status") == "dead":
             dead.append(r)
