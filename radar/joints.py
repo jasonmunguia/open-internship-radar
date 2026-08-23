@@ -63,6 +63,17 @@ JOINTS = {
                     "as JSON, each citing its evidence rows; may web-search company "
                     "context; never edits any file; malformed output is a no-op",
     },
+    # Liveness verdict on ambiguous posting pages (2026-08-22 per the operator): rendered
+    # text that neither self-identifies as closed nor clearly shows an open application
+    # path. Fixed schema + mechanical judgment -> small model (the registry's own rule).
+    "liveness": {
+        "model": os.environ.get("IR_LIVENESS_MODEL", "haiku"),
+        "timeout": 600, "batch": 10,
+        "argv_extra": ["--output-format", "text"],
+        "contract": "returns {i, status: live|dead|unsure} per row from page text alone; "
+                    "dead requires explicit closed/filled/expired/not-found evidence on "
+                    "the page; never infers from posting age; unsure is a valid answer",
+    },
     # Not in the original four-joint sketch — found while building this registry, which is the point.
     "source_heal": {
         "model": "sonnet", "timeout": 900,

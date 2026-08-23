@@ -448,7 +448,7 @@ def is_posting_live(url, timeout=12):
         return e.code not in (404, 410)
     except Exception:
         return True
-    dead_markers = ("no longer accepting applications", "this job is no longer available",
-                    "position has been filled", "posting is closed", "job posting not found",
-                    "this role is closed", "no longer open", "requisition is closed")
-    return not any(m in body for m in dead_markers)
+    # Marker list lives in radar/liveness.py (the digest's gate) so the two checks
+    # cannot drift apart — one vocabulary for "this page says it is closed".
+    from radar.liveness import DEAD_MARKERS
+    return not any(m in body for m in DEAD_MARKERS)

@@ -419,6 +419,30 @@ def main():
               + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _unverified[:15])
               + ("" if len(_unverified) <= 15 else f" … +{len(_unverified) - 15} more"))
 
+    # ---- LIVENESS GATE (2026-08-22 per the operator): only verifiably-OPEN roles ship ----
+    # The queue never expires by age, so a row can die at the source and still be
+    # recommended weeks later — a tapped-through digest surfaced expired postings.
+    # Every send now re-verifies (live verdicts expire after 20h): cached verdict ->
+    # stdlib GET -> Scrapling render -> `liveness` joint on ambiguous text. Dead rows
+    # drop permanently; unverifiable rows are HELD and retried, never shipped; a
+    # wholesale checker failure defers the send (defer-don't-degrade, 18:00 backstop).
+    # Runs AFTER the tier gate on purpose: never spend network checks on rows the
+    # tier gate would discard anyway.
+    from radar.liveness import sweep as _live_sweep
+    roles, _lv_dead, _lv_unsure, _lv_q = _live_sweep(roles, allow_network=not DRY)
+    if _lv_dead:
+        print(f"[liveness] dropped {len(_lv_dead)} dead postings: "
+              + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _lv_dead[:15])
+              + ("" if len(_lv_dead) <= 15 else f" … +{len(_lv_dead) - 15} more"))
+    if _lv_unsure:
+        print(f"[liveness] held {len(_lv_unsure)} unverifiable rows (retry tomorrow): "
+              + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _lv_unsure[:15])
+              + ("" if len(_lv_unsure) <= 15 else f" … +{len(_lv_unsure) - 15} more"))
+    if _lv_q.get("error") and _lv_unsure and not DRY and datetime.now().hour < 18:
+        print(f"[defer] liveness checker failed ({_lv_q['error']}) with {len(_lv_unsure)} rows unverified — not sending")
+        _mark_deferred(f"liveness checker failed with {len(_lv_unsure)} rows unverified: {_lv_q['error']}")
+        return
+
     _shown = qs.mark_shown(roles) if not DRY else {}   # mark_shown writes shown.json + Wayback
     _relay = RELAY_BASE                                # unset -> raw links, never dead links
 
