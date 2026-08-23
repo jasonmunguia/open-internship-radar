@@ -128,6 +128,13 @@ ats:
   - {name: Snowflake, ats: ashby, token: snowflake}
   - {name: ServiceNow, ats: smartrecruiters, token: ServiceNow}
   - {name: Netflix, ats: eightfold, token: "explore.jobs.netflix.net|netflix.com"}
+  # Added 2026-08-22 (big-corp gap audit): finance/CPG/defense giants never reach the
+  # aggregator boards. Token probed live: jpmc|CX_1001 returned 99 intern reqs incl.
+  # "2027 Markets Summer Analyst Program"; job URL verified 200. Morgan Stanley
+  # (eightfold, 403), Deloitte/Visa (no public SR org), Lockheed/RTX/PepsiCo/P&G/J&J
+  # (Phenom, needs a renderer-backed fetcher) remain OPEN GAPS — never fake coverage
+  # with guessed tokens.
+  - {name: JPMorgan Chase, ats: oraclecloud, token: "jpmc|CX_1001"}
 
 # Substack RSS feeds — new issues appear in the morning digest
   # Added 2026-08-08. Every token PROBED LIVE against its ATS API before being written

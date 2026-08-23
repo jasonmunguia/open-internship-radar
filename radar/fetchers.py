@@ -152,6 +152,27 @@ def fetch_eightfold(company, token):
             break
     return out
 
+def fetch_oraclecloud(company, token):
+    """token = 'tenant|siteNumber', e.g. 'jpmc|CX_1001'. Oracle Cloud Recruiting's public
+    CE API — keyless JSON, used by the finance/CPG giants the aggregator boards never
+    carry (verified 2026-08-22: jpmc returned '2027 Markets Summer Analyst Program')."""
+    tenant, _, site = token.partition("|")
+    # `expand` is REQUIRED: without it the API returns 200 with an empty requisitionList
+    # — a classic wrong-200 (verified 2026-08-22: same query, 0 rows bare vs 99 expanded).
+    data = json.loads(_get(
+        f"https://{tenant}.fa.oraclecloud.com/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
+        f"?onlyData=true&expand=requisitionList.secondaryLocations"
+        f"&finder=findReqs;siteNumber={site},keyword=intern,limit=100"))
+    out = []
+    for j in (data.get("items") or [{}])[0].get("requisitionList", []):
+        rid = j.get("Id", "")
+        out.append({"company": company, "title": j.get("Title", ""),
+                    "location": j.get("PrimaryLocation", ""),
+                    "url": f"https://{tenant}.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/{site}/job/{rid}",
+                    "department": "", "posted_at": str(j.get("PostedDate", "")),
+                    "source": f"oraclecloud:{tenant}"})
+    return out
+
 def fetch_ashby(company, org):
     data = json.loads(_get(f"https://api.ashbyhq.com/posting-api/job-board/{org}"), strict=False)
     return [{"company": company, "title": j["title"], "location": j.get("location", ""),
@@ -406,7 +427,7 @@ def fetch_all(sources):
     simple = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby,
               "getro": fetch_getro, "manatal": fetch_manatal, "consider": fetch_consider,
               "workday": fetch_workday, "smartrecruiters": fetch_smartrecruiters,
-              "eightfold": fetch_eightfold}
+              "eightfold": fetch_eightfold, "oraclecloud": fetch_oraclecloud}
     standalone = {"a16z": fetch_a16z, "amazon": fetch_amazon, "bcg": fetch_bcg,
                   "rippling": fetch_rippling, "speedrun": fetch_speedrun}
     for e in sources.get("ats", []):

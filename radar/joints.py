@@ -27,26 +27,26 @@ if not os.path.exists(CLAUDE):
 
 JOINTS = {
     "eligibility": {
-        "model": os.environ.get("IR_ELIGIBILITY_MODEL", "sonnet"),
+        "model": os.environ.get("IR_ELIGIBILITY_MODEL", "opus"),
         "timeout": 1800, "batch": 10,
         "argv_extra": ["--output-format", "text"],
         "contract": "returns {eligible, why}; may ONLY remove the impossible; defaults "
                     "to eligible when unsure; never expresses preference",
     },
     "slug_resolve": {
-        "model": "sonnet", "timeout": 900,
+        "model": "opus", "timeout": 900,
         "argv_extra": ["--permission-mode", "bypassPermissions"],
         "contract": "returns {company: slug}; every answer re-verified through the same "
                     "gates as a guessed slug; omission is correct, guessing is not",
     },
     "discovery": {
-        "model": "sonnet", "timeout": 900,
+        "model": "opus", "timeout": 900,
         "argv_extra": ["--permission-mode", "bypassPermissions"],
         "contract": "returns postings actually seen; never constructs plausible URLs; "
                     "empty array is a valid answer",
     },
     "calendar": {
-        "model": "sonnet", "timeout": 1800,
+        "model": "opus", "timeout": 1800,
         "argv_extra": ["--permission-mode", "bypassPermissions"],
         "contract": "may revise dates with a cited evidence URL; may not invent "
                     "programs; malformed output is a no-op, never a partial write",
@@ -57,7 +57,7 @@ JOINTS = {
     # the research joints above. Output is PROPOSALS ONLY; applying any of them to
     # profile.yaml is the operator's call, made in conversation, never here.
     "feedback_patterns": {
-        "model": "sonnet", "timeout": 900,
+        "model": "opus", "timeout": 900,
         "argv_extra": ["--allowedTools", "WebSearch,WebFetch"],
         "contract": "reads verdict rows joined to queue facts; returns pattern proposals "
                     "as JSON, each citing its evidence rows; may web-search company "
@@ -76,7 +76,7 @@ JOINTS = {
     },
     # Not in the original four-joint sketch — found while building this registry, which is the point.
     "source_heal": {
-        "model": "sonnet", "timeout": 900,
+        "model": "opus", "timeout": 900,
         "argv_extra": ["--permission-mode", "acceptEdits"],
         "contract": "may edit ONLY the failed source's entry in sources.yaml (or remove "
                     "it and note the gap in README); must verify the fix returns jobs; "
