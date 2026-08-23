@@ -56,6 +56,19 @@ def test_workday_url_maps_to_cxs_endpoint():
     assert m2 and m2.group(3) == "Careers"
 
 
+def test_redirect_away_from_job_path_is_dead():
+    """Verified live 2026-08-22: KnowBe4's greenhouse posting 302'd to the board root
+    with ?error=true — the pulled-req pattern the raw status code can't see."""
+    ra = liveness.redirected_away
+    assert ra("https://job-boards.greenhouse.io/knowbe4/jobs/8660687002",
+              "https://job-boards.greenhouse.io/knowbe4?error=true")
+    assert ra("https://boards.greenhouse.io/x/jobs/123456",
+              "https://boards.greenhouse.io/x")          # job segment vanished
+    assert not ra("https://a.com/jobs/123", "https://a.com/jobs/123")       # no redirect
+    assert not ra("https://a.com/en/jobs/123", "https://a.com/en-us/jobs/123")  # locale hop keeps the job
+    assert not ra("https://a.com/careers", "https://a.com/careers/home")    # no job path to lose
+
+
 def test_jobright_valid_through_parses():
     body = '... "validThrough":"2026-09-20T19:29:17" ...'
     vt = liveness._VALID_THROUGH.search(body)

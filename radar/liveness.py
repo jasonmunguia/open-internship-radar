@@ -74,10 +74,25 @@ def classify(status, body, url=""):
     return "live"
 
 
+_JOB_PATH = re.compile(r"/jobs?/[A-Za-z0-9._~-]{4,}")
+
+
+def redirected_away(orig, final):
+    """A posting URL that redirects AWAY from its own job path (to the board root, a
+    careers homepage, or an ?error page) is a pulled req — verified 2026-08-22 on
+    KnowBe4: /jobs/8660687002 302'd to the greenhouse board root with ?error=true."""
+    if not final or final == orig:
+        return False
+    if "error=true" in final:
+        return True
+    return bool(_JOB_PATH.search(orig or "")) and not _JOB_PATH.search(final)
+
+
 def probe(url, timeout=12):
     """Layer 1: one cheap GET, host-aware. No URL means no way to verify — unsure,
     never live. Workday asks the CXS JSON API (authoritative); jobright pages are
-    judged by their embedded validThrough expiry; everything else by classify()."""
+    judged by their embedded validThrough expiry; a redirect away from the job path
+    is a pulled req; everything else by classify()."""
     if not url:
         return "unsure"
     m = _WORKDAY.match(url)
@@ -98,6 +113,8 @@ def probe(url, timeout=12):
         with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read(300000 if "jobright.ai" in url else 60000).decode("utf-8", "replace")
             status = r.status
+            if redirected_away(url, r.geturl()):
+                return "dead"
     except urllib.error.HTTPError as e:
         return classify(e.code, "", url)
     except Exception:
@@ -136,12 +153,14 @@ def _judge_batch(batch):
               "url": r.get("url", ""), "page_text": (ex or "")[:1200]}
              for i, (_jid, r, ex) in enumerate(batch)]
     prompt = (
-        "For each job posting below, judge from page_text ALONE whether the posting is "
-        "still open. status is 'dead' ONLY when the text explicitly says the role is "
-        "closed, filled, expired, or not found. status is 'live' ONLY when the text "
-        "clearly shows this specific role open with a way to apply. Anything else — "
-        "empty text, a careers homepage, a login wall, ambiguity — is 'unsure'. Never "
-        "infer from posting age or plausibility.\n\n"
+        "For each job posting below, determine whether the posting is still open. "
+        "Judge page_text when it is decisive; when it is empty or ambiguous, FETCH the "
+        "url yourself with WebFetch and judge what the live page says. status is 'dead' "
+        "ONLY on explicit evidence the role is closed, filled, expired, or not found "
+        "(including the url redirecting to a careers homepage instead of this role). "
+        "status is 'live' ONLY when this specific role is shown open with a way to "
+        "apply. 'unsure' is reserved for pages you cannot reach at all — never for "
+        "laziness. Never infer from posting age or plausibility.\n\n"
         f"POSTINGS:\n{json.dumps(items)}\n\n"
         'Return ONLY a JSON array: [{"i":<idx>,"status":"live|dead|unsure"}]. No prose.')
     try:
@@ -203,8 +222,11 @@ def sweep(rows, allow_network=True):
         else:
             needs_render.append((jid, r))
 
-    # Layer 2 — a real browser per page, so serial and capped; overflow is held to tomorrow.
-    cap = int(os.environ.get("IR_LIVECHECK_RENDER_LIMIT", "60"))
+    # Layer 2 — a real browser per page, so serial. The cap is a runaway backstop, NOT a
+    # daily budget: it was 60 on 2026-08-22 and starved 30 rows into "held" while the
+    # renderer sat idle — every one it was actually given, it settled. Every row gets
+    # checked (per the operator: the goal is a verdict on every single post).
+    cap = int(os.environ.get("IR_LIVECHECK_RENDER_LIMIT", "500"))
     unsure.extend(r for _, r in needs_render[cap:])
     needs_judgment = []
     for jid, r in needs_render[:cap]:
@@ -215,7 +237,8 @@ def sweep(rows, allow_network=True):
             needs_judgment.append((jid, r, excerpt))
 
     # Layer 3 — batched model judgment on whatever survived both deterministic layers.
-    batch_size = 10
+    from radar.joints import JOINTS
+    batch_size = JOINTS["liveness"]["batch"]
     for s in range(0, len(needs_judgment), batch_size):
         chunk = needs_judgment[s:s + batch_size]
         verdicts, err = _judge_batch(chunk)
