@@ -367,6 +367,64 @@ def fetch_manatal(company, org):
             break
     return out
 
+def _strip_utm(url):
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+    p = urlsplit(url)
+    q = [(k, v) for k, v in parse_qsl(p.query) if not k.startswith("utm_")]
+    return urlunsplit((p.scheme, p.netloc, p.path, urlencode(q), ""))
+
+def _resolve_click(url, timeout=12):
+    """Follow a simplify.jobs click-tracker redirect to the real ATS posting. The click
+    URL matches liveness's job-path regex while some final career pages do not, so a row
+    kept on the click URL can be falsely judged a pulled req (redirected_away) once the
+    redirect lands somewhere without /job/ in the path. geturl() needs no body read.
+    Resolution failure keeps the click URL — it still opens for a human."""
+    try:
+        req = urllib.request.Request(url, headers=UA)
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return _strip_utm(r.geturl()) or url
+    except (OSError, ValueError):        # URLError/timeout are OSError; bad URL is ValueError
+        return url
+
+# apmlist.org status enum, read from the site's own JS bundle (chunk 1252, 2026-08-27):
+# {OPEN:1, SOON:2, NOT_YET:3, CLOSED:4}. Only OPEN is applyable; pre-open programs are
+# the release calendar's job (calendar_research already cites apmlist as evidence).
+_APMLIST_OPEN = "1"
+_APMLIST_REC = re.compile(r'(?=\{"id":"[a-f0-9-]{36}","title":")')
+
+def fetch_apmlist(company="APM List"):
+    """apmlist.org — curated APM/PM program tracker (Simplify-backed). No public JSON
+    endpoint; the records ride the Next.js RSC flight payload embedded in the homepage
+    HTML. Each flat record ends with "status":N,"readGuide": — the split anchor
+    (id-then-title) matches only top-level records, and truncating each chunk at
+    "readGuide" keeps a record's field search from bleeding into trailing payload.
+    Zero records TOTAL means the payload format changed and must surface as an error
+    (counts -1 in health monitoring), never as a quiet 0 — zero OPEN rows is legitimate."""
+    text = _get("https://apmlist.org", timeout=30).replace('\\"', '"')
+    chunks = _APMLIST_REC.split(text)[1:]
+    out, total = [], 0
+    for c in chunks:
+        c = c.split('"readGuide"')[0]
+        title = re.match(r'\{"id":"[a-f0-9-]{36}","title":"((?:[^"\\]|\\.)*)"', c)
+        comp = re.search(r'"company":\{"name":"((?:[^"\\]|\\.)*)"', c)
+        url = re.search(r'"url":"(https://simplify\.jobs/jobs/click/[a-f0-9-]+)"', c)
+        status = re.search(r'"status":(\d)', c)
+        if not (title and comp and url and status):
+            continue
+        total += 1
+        if status.group(1) != _APMLIST_OPEN:
+            continue
+        loc = re.search(r'"locations":\[\{"value":"((?:[^"\\]|\\.)*)"', c)
+        sal = re.search(r'"min_annual_salary":(\d+),"max_annual_salary":(\d+)', c)
+        pay = f"${int(sal.group(1)):,}–${int(sal.group(2)):,}/yr" if sal else ""
+        out.append({"company": comp.group(1), "title": title.group(1),
+                    "location": loc.group(1) if loc else "",
+                    "url": _resolve_click(url.group(1)), "department": "Product",
+                    "posted_at": "", "pay": pay, "source": "apmlist"})
+    if total == 0:
+        raise ValueError("apmlist: 0 records parsed from RSC payload — page format changed")
+    return out
+
 MD_ROW = re.compile(r"^\|(.+)\|\s*$")
 LINK = re.compile(r"\[([^\]]*)\]\(([^)]+)\)|href=\"([^\"]+)\"")
 
@@ -429,7 +487,8 @@ def fetch_all(sources):
               "workday": fetch_workday, "smartrecruiters": fetch_smartrecruiters,
               "eightfold": fetch_eightfold, "oraclecloud": fetch_oraclecloud}
     standalone = {"a16z": fetch_a16z, "amazon": fetch_amazon, "bcg": fetch_bcg,
-                  "rippling": fetch_rippling, "speedrun": fetch_speedrun}
+                  "rippling": fetch_rippling, "speedrun": fetch_speedrun,
+                  "apmlist": fetch_apmlist}
     for e in sources.get("ats", []):
         try:
             if e["ats"] in simple:
