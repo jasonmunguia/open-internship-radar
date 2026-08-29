@@ -343,7 +343,11 @@ def main():
             # "Is it available" and "did it work" are different questions. Overnight the probe
             # passed and then every batch timed out at 120s, so keyword-only scores shipped --
             # the exact degradation this logic exists to prevent. Judge the OUTPUT, not the tool.
-            if _bad_b and _bad_b >= _ok_b and datetime.now().hour < 18:
+            # 2026-08-29: the gate is ABSOLUTE. Any failed batch means some
+            # rows would ship unvetted, and no 18:00 backstop sends a degraded email —
+            # a day with no clean pass is a day with no email, and the dead-man's
+            # switch says why. (Previously: defer only if bad >= ok and before 18:00.)
+            if _bad_b:
                 print(f"[defer] eligibility filter degraded ({_ok_b} ok / {_bad_b} failed) — not sending")
                 _mark_deferred(f"eligibility filter degraded: {_ok_b} ok / {_bad_b} failed batches")
                 return
@@ -409,7 +413,7 @@ def main():
         _tcache = _load_tier_cache()   # both resolvers persist to the cache file
         _rescued, _unverified = rescore_and_partition(_unverified, profile, _funded, _tcache)
         roles += _rescued
-        if _res_err and _unverified and datetime.now().hour < 18:
+        if _res_err and _unverified:
             print(f"[defer] tier gate: resolver failed ({_res_err}) with {len(_unverified)} rows unverified — not sending")
             _mark_deferred(f"tier resolver failed with {len(_unverified)} rows unverified: {_res_err}")
             return
@@ -438,7 +442,7 @@ def main():
         print(f"[liveness] held {len(_lv_unsure)} unverifiable rows (retry tomorrow): "
               + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _lv_unsure[:15])
               + ("" if len(_lv_unsure) <= 15 else f" … +{len(_lv_unsure) - 15} more"))
-    if _lv_q.get("error") and _lv_unsure and not DRY and datetime.now().hour < 18:
+    if _lv_q.get("error") and _lv_unsure and not DRY:
         print(f"[defer] liveness checker failed ({_lv_q['error']}) with {len(_lv_unsure)} rows unverified — not sending")
         _mark_deferred(f"liveness checker failed with {len(_lv_unsure)} rows unverified: {_lv_q['error']}")
         return
@@ -469,7 +473,7 @@ def main():
                 _rq(); _fi(stale, band=(0, 100), batch_size=10, timeout=900)
                 _o, _b = _lq()
                 print(f"[eligibility] display pass: {len(stale)} rows, {_o} ok / {_b} failed")
-                if _b and _b >= _o and datetime.now().hour < 18:
+                if _b:
                     # Same rule as the rescue pass. Rows reaching the email with no reasoning
                     # is the degradation, and it was ungated here.
                     print("[defer] display eligibility filter degraded — not sending; will retry")
@@ -490,15 +494,17 @@ def main():
     # A 10/10 email at 9am beats a 7/10 at 7:20. If the local Claude eligibility filter cannot run —
     # laptop asleep, CLI missing, session dead — do NOT send a rule-scored-only digest.
     # Exit quietly; launchd retries hourly and fires the moment the machine is usable.
-    # Hard backstop at 18:00: a late good email beats a bad one, but NO email beats both.
+    # NO degraded send, ever (2026-08-29 — the 18:00 send-anyway backstop is
+    # gone): the email goes out only after every LLM pass ran clean over every row.
+    # A day with no clean pass is a day with no email; the heartbeat says why.
     if not DRY and _sent_today():
         print("digest already sent today — nothing to do")
         return
-    if not DRY and not _network_up() and datetime.now().hour < 18:
+    if not DRY and not _network_up():
         print("[defer] no network (likely just woke) — not sending; will retry")
         _mark_deferred("no network at wake")
         return
-    if not DRY and not _llm_available() and datetime.now().hour < 18:
+    if not DRY and not _llm_available():
         # Record the deferral so the dead-man's-switch can tell "waiting for a usable machine"
         # apart from "the digest is broken". Without this, every deferred morning would page
         # the operator with a false stale-digest alarm and the alert would stop meaning anything.
