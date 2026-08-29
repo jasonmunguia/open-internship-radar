@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main        # dispatch pins github.sha to a stale tip; queued runs must
+                           # start from the branch head their predecessor just pushed
       - name: Append click
         env:
           P: ${{ toJSON(github.event.client_payload) }}
