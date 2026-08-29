@@ -2,8 +2,9 @@
 import hashlib, json, os, re, sys, time, urllib.request
 import yaml
 from radar.fetchers import fetch_all, fetch_substack, watch_page, is_posting_live
+from radar.queue_state import relay as qs_relay
 from radar.score import score_posting, is_us_location
-from radar.settings import MENTION
+from radar.settings import MENTION, RELAY_BASE
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEEN = os.path.join(ROOT, "data", "seen.json")
@@ -121,6 +122,23 @@ def fit_brief_md(p, score, brief, intel=None):
         f"**Location:** {p.get('location','?')}" + (f" | **Posted:** {p['posted_at']}" if p.get("posted_at") else ""),
         f"**Apply:** {p['url']}",
     ]
+    # ✓/✗ verdict buttons on burning alerts too (2026-08-29 per the operator) — the digest had
+    # them, the Apply-Now emails didn't, so alert rows never fed the tap training. Same
+    # relay and job_id as the digest, so a tap here and a tap there collapse to one
+    # verdict. Raw HTML anchors survive send_alert_email's md->html regexes untouched and
+    # degrade to plain links in the GitHub-issue fallback. RELAY_BASE unset -> no
+    # buttons, never dead links.
+    if RELAY_BASE:
+        y = qs_relay("", p, RELAY_BASE, action="yes")
+        n = qs_relay("", p, RELAY_BASE, action="no")
+        a = qs_relay(p.get("url", ""), p, RELAY_BASE, action="applied")
+        lines.append(
+            f"<a href='{y}' style='background:#059669;color:#fff;padding:2px 10px;"
+            f"border-radius:4px;text-decoration:none'>✓ good fit</a>&nbsp;&nbsp;"
+            f"<a href='{n}' style='background:#dc2626;color:#fff;padding:2px 10px;"
+            f"border-radius:4px;text-decoration:none'>✗ not for me</a>&nbsp;&nbsp;"
+            f"<a href='{a}' style='background:#1d4ed8;color:#fff;padding:2px 10px;"
+            f"border-radius:4px;text-decoration:none'>I applied ✅</a>")
     blurb = company_blurb(p["company"], intel)
     if blurb:
         lines.append(f"**What they do:** {blurb}")

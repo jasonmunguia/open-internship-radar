@@ -152,6 +152,12 @@ ats:
   # Added 2026-08-27: apmlist.org — curated APM/PM program tracker. Fetcher parses the
   # RSC payload and ships OPEN rows only (pre-open programs are calendar territory).
   - {name: APM List, ats: apmlist, token: apmlist}
+  # Verified live 2026-08-29 (through our own fetchers). The rest of that day's
+  # big-tech audit was already covered by the household-name batch above; still
+  # aggregator-only (no public JSON API): Uber, Snap (workday 422), Netflix (eightfold
+  # host pattern differs) — zshah101/SimplifyJobs/jobright repos carry those.
+  - {name: Etched, ats: ashby, token: Etched}
+  - {name: Spotify, ats: lever, token: spotify}
 newsletters:
   - {name: "job hunting sux (Jordan Mazer)", sub: jordanmazer}
   - {name: "Ali Rohde Jobs", sub: alirohdejobs}

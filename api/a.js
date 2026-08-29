@@ -57,14 +57,17 @@ function page(j, action) {
   if (action === "yes" || action === "no") {
     const yes = action === "yes";
     const flip = yes ? "no" : "yes";
+    // Auto-close so a verdict tap costs zero attention (2026-08-29 per the operator: the
+    // confirmation tab was the slowest part of filtering). window.close() works on a
+    // fresh tab with no history (desktop Gmail); mobile in-app browsers ignore it, so
+    // the fallback copy + flip link stay. The 400ms delay gives the tap time to paint.
     return `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
 <body style="font:16px -apple-system,sans-serif;padding:44px;max-width:34rem;margin:auto">
-<h2 style="margin:0 0 6px">Saved: ${yes ? "👍 more like this" : "👎 not for me"}</h2>
-<p style="color:#555;margin:0 0 22px">${yes
-    ? "The row stays on your list until you apply. Weekly, your taps train the matching."
-    : "This one stops showing tomorrow. Weekly, your taps train the matching."}</p>
+<h2 style="margin:0 0 6px">Saved: ${yes ? "👍 more like this" : "👎 not for me"} — closing…</h2>
+<p style="color:#555;margin:0 0 22px">You can close this tab.
 <a href="/api/a?j=${encodeURIComponent(j)}&k=${flip}"
-   style="color:#b45309;text-decoration:none">Tapped wrong? Mark ${yes ? "👎" : "👍"} instead</a></body>`;
+   style="color:#b45309;text-decoration:none">Tapped wrong? Mark ${yes ? "👎" : "👍"} instead</a></p>
+<script>setTimeout(function(){window.close()},400)</script></body>`;
   }
   return `<!doctype html><meta name=viewport content="width=device-width,initial-scale=1">
 <body style="font:16px -apple-system,sans-serif;padding:44px;max-width:34rem;margin:auto">
