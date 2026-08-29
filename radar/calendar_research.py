@@ -40,6 +40,7 @@ acceptable only when they quote a date.
 For EACH program in the calendar below, determine whether `expected_open` is still the best
 estimate for the stated term. Also check https://apmlist.com and official APM/PM program pages
 for programs the calendar is missing entirely.
+{consulting}
 
 Rules, in order of importance:
 1. NEVER invent a program. If you cannot find evidence, leave the entry unchanged.
@@ -60,6 +61,39 @@ CURRENT CALENDAR:
 """
 
 
+MC_URL = "https://managementconsulted.com/consulting-application-deadlines/"
+MC_SNAP = os.path.join(ROOT, "data", "consulting_deadlines.txt")
+
+def _consulting_block(cap=6000):
+    """Consulting-deadline intel (2026-08-29): managementconsulted.com keeps
+    the live MBB/Big-4 application windows but 403s plain fetches, so the nightly
+    Scrapling-renders it here and hands the TEXT to the joint instead of hoping the
+    joint fetches it itself. Failure degrades to yesterday's snapshot, then to a note —
+    never blocks the calendar run."""
+    try:
+        from radar.scrapling_fetch import _stealth
+        from radar.verdict_jd import visible_text
+        body = getattr(_stealth(MC_URL), "body", "")
+        if isinstance(body, bytes):
+            body = body.decode("utf-8", "replace")
+        text = visible_text(body)[:cap]
+        if len(text) > 500:
+            with open(MC_SNAP, "w") as fh:
+                fh.write(text)
+    except Exception as ex:  # noqa: BLE001 — Scrapling/playwright raise their own classes;
+        # anything here must DEGRADE to the cached snapshot, never fail the calendar stage
+        text = ""
+        print(f"[calendar] consulting snapshot fetch failed: {type(ex).__name__}: {ex}")
+    if not text and os.path.exists(MC_SNAP):
+        with open(MC_SNAP) as fh:
+            text = fh.read()[:cap] + "\n(NOTE: cached from an earlier night)"
+    if not text:
+        return "(consulting-deadlines page unavailable tonight — skip that source)"
+    return ("CONSULTING APPLICATION DEADLINES (managementconsulted.com, fetched tonight — "
+            "fold McKinsey/Bain/BCG/Big-4 windows into the calendar; evidence URL is "
+            + MC_URL + "):\n" + text)
+
+
 def run(timeout=None, model=None):
     """Invoke the local Claude CLI to refresh the calendar. Returns a change report.
 
@@ -77,7 +111,7 @@ def run(timeout=None, model=None):
                                       "release_calendar.example.yaml and edit it first"}
     current = open(CAL).read()
     prompt = PROMPT.format(today=date.today().isoformat(), calendar=current,
-                           observed=evidence_block())
+                           observed=evidence_block(), consulting=_consulting_block())
 
     try:
         out = run_joint("calendar", prompt, timeout=timeout, model=model).stdout
