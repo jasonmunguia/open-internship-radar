@@ -64,7 +64,7 @@ CURRENT CALENDAR:
 MC_URL = "https://managementconsulted.com/consulting-application-deadlines/"
 MC_SNAP = os.path.join(ROOT, "data", "consulting_deadlines.txt")
 
-def _consulting_block(cap=6000):
+def _consulting_block(cap=12000):
     """Consulting-deadline intel (2026-08-29): managementconsulted.com keeps
     the live MBB/Big-4 application windows but 403s plain fetches, so the nightly
     Scrapling-renders it here and hands the TEXT to the joint instead of hoping the
@@ -77,9 +77,17 @@ def _consulting_block(cap=6000):
         if isinstance(body, bytes):
             body = body.decode("utf-8", "replace")
         text = visible_text(body)[:cap]
-        if len(text) > 500:
+        # A member-session grab (Arc, manual) is ~10x the anonymous public shell; never
+        # let tonight's smaller anonymous fetch clobber a richer stored snapshot.
+        stored = 0
+        if os.path.exists(MC_SNAP):
+            with open(MC_SNAP) as fh:
+                stored = len(fh.read())
+        if len(text) > 500 and len(text) >= stored * 0.6:
             with open(MC_SNAP, "w") as fh:
                 fh.write(text)
+        elif stored:
+            text = ""      # fall through to the richer cached snapshot below
     except Exception as ex:  # noqa: BLE001 — Scrapling/playwright raise their own classes;
         # anything here must DEGRADE to the cached snapshot, never fail the calendar stage
         text = ""
@@ -90,7 +98,7 @@ def _consulting_block(cap=6000):
     if not text:
         return "(consulting-deadlines page unavailable tonight — skip that source)"
     return ("CONSULTING APPLICATION DEADLINES (managementconsulted.com, fetched tonight — "
-            "fold McKinsey/Bain/BCG/Big-4 windows into the calendar; evidence URL is "
+            "fold McKinsey/Bain/BCG/Big-4/Accenture windows into the calendar; evidence URL is "
             + MC_URL + "):\n" + text)
 
 
