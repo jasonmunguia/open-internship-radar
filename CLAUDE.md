@@ -104,6 +104,25 @@ digest done: nothing sent                                                  ← a
 An agent that cannot recognise a broken run will report success. When in doubt, compare
 today's log to these shapes before believing either the log or yourself.
 
+## Where the system runs — the three-surface runtime map
+- **GitHub Actions (cloud, laptop-independent):** the 2-hour poll of every source
+  (ATS boards, aggregator repos, watch pages, newsletters) + instant alert emails;
+  `apply-log`, the tap RECORDER (see below); the daily dead-man's-switch heartbeat.
+- **The operator's machine (launchd, needs it awake — lid-closed on battery it runs
+  in DarkWake slices, stretched over hours):** the morning digest build (every LLM
+  joint + the absolute defer gate + the send), the overnight nightly (tier backfill,
+  discovery, calendar incl. the consulting-deadlines snapshot, verdict-JD capture,
+  pattern analysis), local Scrapling scrape, self-heal.
+- **Vercel (the click relay, `api/a.js`):** every button in every email points here.
+  The relay and the recorder are two links in one chain: button tap → Vercel relay
+  (responds in milliseconds: fires a `repository_dispatch` event to GitHub, then
+  302s to the posting or self-closes; it stores nothing durable itself) → GitHub
+  Actions `apply-log` (the recorder: receives the event, appends the row to
+  `data/feedback.jsonl` or `data/applied.jsonl`, commits). Split on purpose: the
+  relay must be instant and cannot safely serialize git writes; Actions can.
+  Concurrency group + union merge on `data/*.jsonl` + live-main checkout keep
+  concurrent taps from racing.
+
 ## Two checkouts — and a third deploy surface
 The checkout your launchd jobs point at (conventionally `~/.internship-radar`) is production. Dev clones are separate. Merging to
 main deploys nothing until production pulls (`cd ~/.internship-radar && git pull`).
