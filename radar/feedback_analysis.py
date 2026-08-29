@@ -56,10 +56,20 @@ def _evidence():
     rows_by_id = {}
     for row in _read_jsonl(QUEUE):
         rows_by_id.setdefault(job_id(row), row)
+    # JD text captured nightly by verdict_jd — role CONTENT the title hides. Absent
+    # for rows whose fetch failed (die-once); the join degrades to facts-only.
+    try:
+        from radar.verdict_jd import excerpts
+        jds = excerpts()
+    except (ImportError, OSError, ValueError):
+        jds = {}
     joined = []
     for jid, v in verdicts.items():
         row = rows_by_id.get(jid, {})
-        joined.append({"verdict": v["action"], **{k: row.get(k, "") for k in _FACTS}})
+        rec = {"verdict": v["action"], **{k: row.get(k, "") for k in _FACTS}}
+        if jds.get(jid):
+            rec["jd_excerpt"] = jds[jid]
+        joined.append(rec)
     return joined, first_ts, last_ts
 
 
@@ -90,7 +100,10 @@ def run():
         f"{json.dumps(joined, indent=1)}\n\n"
         "Find the patterns their verdicts reveal, especially where they DISAGREE with the "
         "system's score/tier. Focus PRIMARILY on the rejections — the 'no' verdicts are "
-        "the correction signal; a 'yes' only confirms what already ships. Web-search a "
+        "the correction signal; a 'yes' only confirms what already ships. Rows may carry "
+        "jd_excerpt, the posting's own description text: use it to catch role-content "
+        "patterns the title hides (e.g. a neutral title over a hypertechnical "
+        "engineering JD). Web-search a "
         "company only when its name alone is ambiguous. "
         "Reply with ONLY a JSON array (no prose, no fences), each element:\n"
         '{"pattern": "<one sentence>", "polarity": "no"|"yes"|"mixed", '

@@ -139,7 +139,7 @@ ats:
 # Substack RSS feeds — new issues appear in the morning digest
   # Added 2026-08-08. Every token PROBED LIVE against its ATS API before being written
   # here — a guessed token is a silent dead feed that looks like coverage.
-  # Atlassian, Uber, Capital One, Amex, Procore, Flock Safety have NO public board
+  # Atlassian, Uber, Capital One, Amex, Procore have NO public board
   # on Greenhouse/Ashby/Lever; they stay repo-covered. (ServiceTitan turned out to
   # be on Workday and MaintainX on Ashby — both direct below as of 2026-08-29.)
   - {name: Roblox, ats: greenhouse, token: roblox}
@@ -162,6 +162,8 @@ ats:
   # PM-target boards verified 2026-08-29 (tokens read off their own careers pages).
   - {name: ServiceTitan, ats: workday, token: "servicetitan@wd1/ServiceTitan"}
   - {name: MaintainX, ats: ashby, token: maintainx}
+  # Found 2026-08-29 via Scrapling render of /careers/positions — token has an encoded space.
+  - {name: Flock Safety, ats: ashby, token: "Flock%20Safety"}
 newsletters:
   - {name: "job hunting sux (Jordan Mazer)", sub: jordanmazer}
   - {name: "Ali Rohde Jobs", sub: alirohdejobs}

@@ -83,6 +83,14 @@ def main():
         from radar.calendar_research import run
         return run()
 
+    def verdict_jds():
+        # Deterministic JD-text capture for every tapped row (2026-08-29),
+        # BEFORE feedback_patterns on purpose — same-night JDs reach that joint's
+        # evidence. Plain GET -> Scrapling; runs here because Scrapling lives on the
+        # local machine, not in the cloud poller.
+        from radar.verdict_jd import capture
+        return capture()
+
     def feedback():
         # Weekly pattern analysis over the 👍/👎 taps. Runs every night but gates
         # itself (min verdicts, min span, new-data-only), so most nights it reports
@@ -104,7 +112,8 @@ def main():
     for name, fn in [("funding", funding), ("tier_backfill", backfill),
                      ("slug_resolution", slugs), ("discovery", discovery),
                      ("observed_opens", observed), ("calendar_research", calendar),
-                     ("feedback_patterns", feedback), ("learning_loop", learning)]:
+                     ("verdict_jd", verdict_jds), ("feedback_patterns", feedback),
+                     ("learning_loop", learning)]:
         _stage(name, fn, report)
 
     os.makedirs(os.path.dirname(REPORT), exist_ok=True)
