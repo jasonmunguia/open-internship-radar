@@ -1,5 +1,19 @@
 # open-internship-radar
 
+### Your inbox
+
+Three emails, and only three: a pre-network heads-up before postings go live, the daily
+apply queue, and instant alerts for anything urgent.
+
+![The three radar emails in a Gmail inbox](docs/inbox.png)
+
+### Your apply list
+
+Every row already passed the full pipeline — role family, T1–T3 company tier, and a
+liveness check — before it earned a line. Tap ✓/✗ to train the matching, `apply→` to go.
+
+![The daily Review & Apply digest](docs/apply-list.png)
+
 An always-on job radar you run yourself. It polls ~164 sources every two hours, scores what it
 finds against role families and company caliber, and emails you three things: **what opens soon**
 (so you can network before the posting exists), **what is open now** (as a queue you work to zero,
