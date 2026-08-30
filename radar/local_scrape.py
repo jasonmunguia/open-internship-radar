@@ -1,5 +1,5 @@
 """LOCAL pre-digest job (launchd ~7:05am): Scrapling-fetch bot-walled public corporates,
-score them, append new ones to the repo queue, push. The 7:20 digest then includes them.
+score them, append new ones to the repo queue, push. The 6:00 digest then includes them.
 Also refreshes deadline pages weekly (Sundays) via Scrapling where they're public."""
 import json, os, subprocess, sys, time
 import yaml

@@ -1,4 +1,4 @@
-"""Morning digest — runs LOCALLY on the operator's Mac at 7:20am via launchd.
+"""Morning digest — runs LOCALLY on the operator's Mac at 6:00am via launchd.
 Sends up to THREE emails — SMTP (tools/mailer.py) primary, Composio fallback:
   #1 NETWORKING HEADS-UP: programs opening within 14 days (nags daily until tapped done) -> pre-warm referrals.
   #2 DAILY APPLY LIST: roles open <=14 days, color-coded by industry, AI eligibility-filtered.
@@ -183,7 +183,7 @@ def sync_repo():
 
 def report_local_health(status, sent):
     """Publish local proof-of-life to the repo so the CLOUD watchdog can see this Mac.
-    Without it, a dead 7:20am digest is invisible — the cloud can't inspect the laptop."""
+    Without it, a dead 6:00am digest is invisible — the cloud can't inspect the laptop."""
     try:
         json.dump({"last_digest": int(time.time()), "sent": sent, "sync": status,
                    "host_date": datetime.now().isoformat(timespec="seconds")},
@@ -491,7 +491,7 @@ def main():
                   "; ".join(f"{r.get('company','?')} — {r.get('eligibility_note','')}" for r in _cut))
 
     # ---- DEFER, DON'T DEGRADE (2026-08-08 per the operator) ----
-    # A 10/10 email at 9am beats a 7/10 at 7:20. If the local Claude eligibility filter cannot run —
+    # A 10/10 email at 9am beats a 7/10 at 6:00. If the local Claude eligibility filter cannot run —
     # laptop asleep, CLI missing, session dead — do NOT send a rule-scored-only digest.
     # Exit quietly; launchd retries hourly and fires the moment the machine is usable.
     # NO degraded send, ever (2026-08-29 — the 18:00 send-anyway backstop is

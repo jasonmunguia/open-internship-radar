@@ -1,7 +1,7 @@
 """Nightly deep pass — the work that needs a laptop, a model, and no hurry.
 
 the operator keeps their machine open, so the expensive judgment-heavy jobs run at 2am rather than
-competing with the 7:20am digest. Each stage is independently wrapped: a stage that fails
+competing with the 6:00am digest. Each stage is independently wrapped: a stage that fails
 must not prevent the ones after it, because a partial refresh beats no refresh.
 
 Order is deliberate. Funding first (cheap, feeds tier bands), then tier backfill (long

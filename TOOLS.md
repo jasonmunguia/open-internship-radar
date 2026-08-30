@@ -37,7 +37,7 @@ check first whether the data is on a public page.
 (`apply-log.yml`), and the dead-man's-switch (`heartbeat.yml`). Cloud-side, no laptop needed.
 
 **launchd** (`~/Library/LaunchAgents/com.internship-digest.plist`) — the daily digest,
-retried hourly 7:20–18:20. It must run locally because the eligibility filter needs the local
+retried hourly 6:00–18:20. It must run locally because the eligibility filter needs the local
 Claude session. launchd does NOT inherit an interactive shell's environment, which is why
 config lives in `config/person.yaml` rather than env vars.
 

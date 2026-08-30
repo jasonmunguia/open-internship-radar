@@ -215,7 +215,7 @@ live first: an alert for a closed req teaches you to ignore alerts.
 ## 7. Reliability: defer, do not degrade
 
 If the quality-improving step cannot run, **do not send a worse version on time.** Wait, retry,
-and send the good one late. A 10/10 email at 9am beats a 7/10 at 7:20, because the whole product
+and send the good one late. A 10/10 email at 9am beats a 7/10 at 6:00, because the whole product
 is trust that the email is worth opening.
 
 Two conditions make this safe:

@@ -41,7 +41,7 @@ def main():
         print(f"DOWN alert sent (age {age_h:.1f}h)")
         return
 
-    # Local-side watchdog: the 7:20am Mac digest publishes data/digest_heartbeat.json on each run.
+    # Local-side watchdog: the 6:00am Mac digest publishes data/digest_heartbeat.json on each run.
     # Stale => that digest is dead (launchd unloaded, python broken, mail credential revoked) and
     # the operator would otherwise just assume the market went quiet. 40h tolerates a closed laptop.
     dage_h = None
@@ -53,7 +53,7 @@ def main():
             if dage_h > 40:
                 create_issue(repo, token,
                              f"⚠️ Morning digest silent for {dage_h:.0f}h",
-                             f"Cloud polling is healthy, but the local 7:20am digest hasn't reported in "
+                             f"Cloud polling is healthy, but the local 6:00am digest hasn't reported in "
                              f"**{dage_h:.1f}h**. Likely: Mac off for a long stretch, the launchd job was "
                              f"unloaded, or the Gmail app password was revoked.\n\nCheck "
                              f"`launchctl list | grep internship` and `tail /tmp/internship-digest.log`. "

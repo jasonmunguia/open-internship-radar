@@ -83,7 +83,7 @@ issue RELAY still works (it uses `GITHUB_TOKEN` inside Actions, not gh).
 digest alone still works.
 
 **launchd** (macOS) — the local engine. Four jobs, ALL FOUR templates in `docs/`
-(digest 7:20 + hourly retries to 18:20, scrape 7:05, nightly 2:10, selfheal every 30
+(digest 6:00 + hourly :20 retries to 18:20, scrape 7:05, nightly 2:10, selfheal every 30
 min). `SETUP.md` covers installing them — launchd expands neither ~ nor $HOME. Without them: no morning emails, no nightly enrichment.
 
 **Vercel** (`api/a.js`, optional) — the click relay: a tap logs to `data/applied.jsonl`

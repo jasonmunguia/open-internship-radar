@@ -128,7 +128,7 @@ best of the three — so a well-funded 40-person startup with no audience still 
 
 ```
 GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
-├─ 127 direct ATS APIs                      ├─ 07:20 digest, retried hourly to 18:20
+├─ 127 direct ATS APIs                      ├─ 06:00 digest, retried hourly to 18:20
 ├─ 25 community job-list repos              │   └─ never sends degraded: any failed LLM
 ├─ VC portfolio boards                      │      pass defers (no send-anyway backstop)
 ├─ (see config/sources.yaml)                └─ 02:10 deep pass

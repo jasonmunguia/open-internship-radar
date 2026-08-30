@@ -37,7 +37,7 @@ secrets: `GMAIL_APP_PASSWORD`, `GMAIL_SENDER`, `ALERT_TO`.
 Copy each `docs/launchd-*.plist.example` to `~/Library/LaunchAgents/com.internship-<name>.plist`,
 replace every `/Users/YOURNAME` with your real home directory (launchd expands neither `~`
 nor `$HOME`), check the python3 path, then `launchctl load` each. Schedules: scrape 7:05,
-digest 7:20 with hourly retries to 18:20 (the StartCalendarInterval array IS the retry
+digest 6:00 with hourly :20 retries to 18:20 (the StartCalendarInterval array IS the retry
 mechanism), nightly 2:10, selfheal every 30 min. The digest must run locally — the
 eligibility joint needs your local coding-agent CLI. Also copy
 `config/release_calendar.example.yaml` to `release_calendar.yaml` and seed it with
