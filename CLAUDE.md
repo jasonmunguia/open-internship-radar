@@ -6,7 +6,7 @@ Read `AGENT_ONBOARDING.md` instead if your job is setting this up for a person.
 ## What this system is
 A deterministic pipeline that finds early-career roles and emails three things: a
 pre-network heads-up, a daily apply queue, and instant alerts. A model is used at exactly
-SIX joints and nowhere else — `radar/joints.py` is the registry, the only door to the
+SEVEN joints and nowhere else — `radar/joints.py` is the registry, the only door to the
 CLI, and the answer to "where does this system use judgment?". `tests/test_joints.py`
 fails the moment a model call appears outside it. (The registry earned its keep the day it
 was written: building it surfaced a fifth joint, `source_heal`, that every prose inventory
@@ -82,7 +82,7 @@ same commit.
   public. Used by tiers/fetch/local_scrape. Use when a fetch returns 403/JS-shell, when
   scoping any enrichment task, when a vendor wants money for public data.
 - **Claude Code CLI** — headless judgment with web search on an existing subscription; the
-  six joints. Any coding-agent CLI honoring the contracts in `joints.py` substitutes.
+  seven joints. Any coding-agent CLI honoring the contracts in `joints.py` substitutes.
 - **mailer** (shipped: `tools/mailer.py`) — headless SMTP as a SPECIFIC named account,
   Keychain-stored password; works from launchd where no MCP exists. Never send as the
   unspecified default — it may be a work mailbox.

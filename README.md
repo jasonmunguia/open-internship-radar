@@ -14,7 +14,7 @@ liveness check — before it earned a line. Tap ✓/✗ to train the matching, `
 
 ![The daily Review & Apply digest](docs/apply-list.png)
 
-An always-on job radar you run yourself. It polls ~164 sources every two hours, scores what it
+An always-on job radar you run yourself. It polls ~170 sources (config/sources.yaml — 171 today) every two hours, scores what it
 finds against role families and company caliber, and emails you three things: **what opens soon**
 (so you can network before the posting exists), **what is open now** (as a queue you work to zero,
 not a feed you skim), and **anything urgent, within the hour**.
