@@ -128,14 +128,16 @@ best of the three — so a well-funded 40-person startup with no audience still 
 
 ```
 GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
-├─ 120 direct ATS APIs                      ├─ 07:20 digest, retried hourly to 18:20
-├─ 25 community job-list repos              │   └─ defers rather than sending a worse email
-├─ VC portfolio boards                      └─ 02:10 deep pass
+├─ 127 direct ATS APIs                      ├─ 07:20 digest, retried hourly to 18:20
+├─ 25 community job-list repos              │   └─ never sends degraded: any failed LLM
+├─ VC portfolio boards                      │      pass defers (no send-anyway backstop)
+├─ (see config/sources.yaml)                └─ 02:10 deep pass
 ├─ watch pages (no-API employers)               ├─ funding history
 ├─ SEC funding filings                          ├─ company tier backfill (scraper)
 └─ score → burning alert if urgent              ├─ resolve what the scraper could not
                                                 ├─ open-web discovery
-                                                └─ refresh the release calendar (LLM + web)
+                                                ├─ refresh the release calendar (LLM + web)
+                                                └─ fetch JD text for every tapped row
 ```
 
 **Deterministic spine, LLM at the joints.** Fetching, parsing, scoring, and delivery are plain
