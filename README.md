@@ -1,6 +1,6 @@
 # open-internship-radar
 
-I hated wasting time **MANUALLY** searching for the best jobs (match) to apply for, specifically **WHEN** (timing), and then **HOW** to land them (network)... so I built it for myself (<ins>and now you ;)</ins>).
+I **HATED** wasting time **MANUALLY** searching for the best jobs (match) to apply for, specifically **WHEN** (timing), and then **HOW** to land them (network)... so I built it for myself (<ins>and now you ;)</ins>).
 
 ### Your inbox
 
