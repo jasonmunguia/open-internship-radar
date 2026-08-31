@@ -9,17 +9,12 @@ apply queue, and instant alerts for anything urgent.
 
 ![The three radar emails in a Gmail inbox](docs/inbox.png)
 
-### Your apply list
-
-Every row already passed the full pipeline — role family, T1–T3 company tier, and a
-liveness check — before it earned a line. Tap ✓/✗ to train the matching, `apply→` to go.
-
-![The daily Review & Apply digest](docs/apply-list.png)
-
 An always-on job radar you run yourself. It polls ~170 sources (config/sources.yaml — 171 today) every two hours, scores what it
 finds against role families and company caliber, and emails you three things: **what opens soon**
 (so you can network before the posting exists), **what is open now** (as a queue you work to zero,
 not a feed you skim), and **anything urgent, within the hour**.
+
+![The daily apply queue — every row already passed role-family, tier, and liveness gates](docs/apply-list.png)
 
 Built by [Jason Munguia](https://github.com/jasonmunguia). Apache-2.0 — free to use, fork and build on, **with credit**.
 
