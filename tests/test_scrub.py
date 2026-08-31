@@ -31,6 +31,14 @@ _SKIP_DIRS = {".git", "__pycache__", "node_modules", ".vercel"}
 _SELF = os.path.abspath(__file__)
 
 
+# The README's byline is the ONE deliberate identity token: the author ships this
+# repo with credit on purpose (Apache-2.0 "with credit", decided 2026-08-22 and
+# reaffirmed 2026-08-31 at publication). Everything else stays scrubbed; this test
+# exists to catch ACCIDENTAL leaks, and a permanent red test trains people to
+# ignore it — so the byline is exempted by exact shape, not by skipping README.md.
+_DELIBERATE_CREDIT = re.compile(r"^Built by \[.+\]\(https://github\.com/.+\)\. Apache-2\.0")
+
+
 def test_no_identity_tokens_in_shipped_files():
     hits = []
     for root, dirs, names in os.walk(REPO):
@@ -45,6 +53,9 @@ def test_no_identity_tokens_in_shipped_files():
                 continue
             for i, line in enumerate(text.splitlines(), 1):
                 if _TOKENS.search(line):
+                    if (os.path.relpath(fp, REPO) == "README.md"
+                            and _DELIBERATE_CREDIT.match(line.strip())):
+                        continue
                     hits.append(f"{os.path.relpath(fp, REPO)}:{i}: {line.strip()[:80]}")
     assert not hits, (
         "author identity leaked into shipped files (scrub the port, do not ship):\n  "
