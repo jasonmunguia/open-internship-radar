@@ -53,6 +53,8 @@ does it well, and stays out of the rest.
 - **Pre-network** — programs opening in the next ~14 days, with a pre-filtered people search per
   company. Repeats daily until you mark it done, because a heads-up shown once on a busy morning
   is a heads-up that never happened.
+
+  ![The pre-network email — referral outreach before the req exists](docs/pre-network.png)
 - **Apply queue** — everything open you have not applied to, grouped Today / This week / Last week
   / This month. Tap a link and it never appears again. Do not tap it and it never disappears — it
   accrues a visible day counter instead.
