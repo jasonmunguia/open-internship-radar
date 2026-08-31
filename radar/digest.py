@@ -68,7 +68,7 @@ def _raw_message(subject, body_html, frm, to):
 def send_email(subject, body_html):
     """Clean-subject HTML email into the operator's inbox — no '[owner/repo]' prefix, full color.
 
-    Composio's active Gmail connection drifts across his accounts, so branch on it:
+    Composio's active Gmail connection drifts across accounts, so branch on it:
       * active IS the school mailbox -> INSERT the message straight into it, then label INBOX+UNREAD.
         (Plain SEND would self-bury in Sent, since example.edu and g.example.edu are one mailbox.)
       * active is any other account -> SEND from there to school (different sender = normal inbox arrival).

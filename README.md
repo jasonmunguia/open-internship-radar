@@ -141,7 +141,7 @@ GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
 ```
 
 **Deterministic spine, LLM at the joints.** Fetching, parsing, scoring, and delivery are plain
-code — same input, same output, debuggable, free. A model is invoked at exactly six registered joints (`radar/joints.py` — enforced by
+code — same input, same output, debuggable, free. A model is invoked at exactly seven registered joints (`radar/joints.py` — enforced by
 `tests/test_joints.py`) where the alternative would be a heuristic that is wrong. Full reasoning in `METHODOLOGY.md` §2.
 
 ---

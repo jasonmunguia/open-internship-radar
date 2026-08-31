@@ -42,7 +42,7 @@ else
   python3 -m pip install -q certifi && good "certifi installed" || warn "certifi missing"
 fi
 
-# 4. Claude CLI (the five LLM joints; digest DEFERS without it, by design)
+# 4. Claude CLI (the seven LLM joints; digest DEFERS without it, by design)
 if command -v claude >/dev/null || [ -x "$HOME/.local/bin/claude" ]; then
   good "claude CLI present"
 else

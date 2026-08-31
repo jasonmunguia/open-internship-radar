@@ -2,8 +2,8 @@
 
 `CLAUDE.md` tells an agent how to WORK ON this repo. This file tells you how to BRING
 SOMEONE ONLINE with it. You have three jobs, in order, and you must know all three before
-you say anything to the human. (If the operator is already online — this repo's owner is —
-your job collapses to Jobs 1 and 2.)
+you say anything to the human. (If the operator tells you they are already online,
+verify the five states below yourself, then your job collapses to Jobs 1 and 2.)
 
 **"Online" is a specific state, not a vibe. All five must be true:**
 1. **Installed** — every dependency resolved; nothing left for the human to go find.
@@ -35,7 +35,7 @@ failed; fix them before proceeding.
   to zero; burning alerts are time-critical only).
 - THE CONTRACT: a role ships iff title matches a role family AND company is T3+. Both.
   Nothing else decides. The LLM removes the impossible; it never expresses preference.
-- The six LLM joints, each one's contract, and where they live (`radar/joints.py`).
+- The seven LLM joints, each one's contract, and where they live (`radar/joints.py`).
 - What runs in the cloud (poll, alerts, click relay, watchdog) vs on the machine
   (digest, scrape, nightly enrichment) — and why (a laptop is closed most of the time;
   the LLM rides a local subscription, not an API key).

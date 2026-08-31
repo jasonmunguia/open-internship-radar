@@ -45,9 +45,12 @@ programs YOU care about, or the pre-network email stays empty.
 ## 6. Click relay (optional but recommended)
 Without it the emails still work; you just lose tap-to-clear, so rows never leave the queue.
 
-1. Fine-grained GitHub token, **Contents: Read and write**, scoped to this repo only
-2. `vercel --prod` from the repo root
-3. Set `GH_TOKEN` and `GH_REPO` in Vercel env vars, redeploy
+1. Fine-grained GitHub token, **Contents: Read and write**, scoped to this repo only —
+   create it at https://github.com/settings/personal-access-tokens/new
+2. `vercel --prod` from the repo root (no account yet? https://vercel.com/signup — the
+   hobby tier is enough; CLI via `npm i -g vercel`)
+3. Set `GH_TOKEN` and `GH_REPO` in Vercel env vars (project → Settings → Environment
+   Variables on vercel.com), redeploy
 4. Put the deployment URL in `person.yaml` as `delivery.relay_base`
 
 `apply-log.yml` must be on your **default branch** or `repository_dispatch` has nowhere to

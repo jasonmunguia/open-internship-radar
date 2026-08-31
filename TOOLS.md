@@ -59,7 +59,7 @@ than racing a file SHA.
 
 **SEC EDGAR** via the `free-apis` skill — Form D filings, the funding tier signal.
 
-## LLM joints — the six places a model is used, and the registry that enforces it
+## LLM joints — the seven places a model is used, and the registry that enforces it
 
 **`radar/joints.py` is the registry and the only door to the CLI** — every joint's model,
 timeout and contract lives there, and `tests/test_joints.py` fails if a model call appears
@@ -85,6 +85,9 @@ surfaced a fifth the prose had missed — which is why the registry exists.)
    verdict taps joined to row facts (gated: ≥10 verdicts, ≥7-day span, new data only).
    Returns pattern PROPOSALS rendered in the digest; never edits any file — applying a
    proposal is the operator's call, made in conversation.
+7. **liveness** (`radar/liveness.py`) — the last resort of the liveness gate: judges
+   rendered posting text that HTTP rules and a Scrapling render both left ambiguous.
+   Unsure is a hold, never a ship; a dead verdict must cite the page's own closed marker.
 
 Title-variant mining from `data/dropped_unmatched.jsonl` is MANUAL today: ask an agent to
 mine the local drop log; it PROPOSES patterns to a human and never auto-adds them. (No
