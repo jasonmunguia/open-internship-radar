@@ -48,7 +48,7 @@ CLI can be substituted; see "LLM joints" below for exactly what it must do.
 **Composio MCP** (`GMAIL_SEND_EMAIL`) — email fallback. Routes by account alias; it silently
 defaults to the wrong mailbox unless `account:` is passed explicitly.
 
-**mailer skill** (`~/.claude/tools/mailer.py`) — primary SMTP send, credentials in Keychain.
+**mailer skill** (shipped: `tools/mailer.py` + `skills/mailer/`) — primary SMTP send, credentials in Keychain.
 Preferred over Composio because it produces a clean subject with no `[owner/repo]` prefix.
 
 **gh CLI** — repo operations and the issue relay used as a last-resort delivery channel.
@@ -57,7 +57,7 @@ Preferred over Composio because it produces a clean subject with no `[owner/repo
 Writes go through `repository_dispatch` so concurrent taps serialise inside Actions rather
 than racing a file SHA.
 
-**SEC EDGAR** via the `free-apis` skill — Form D filings, the funding tier signal.
+**SEC EDGAR** (self-contained: `radar/funding.py`, plain urllib against sec.gov — no key, no skill needed) — Form D filings, the funding tier signal.
 
 ## LLM joints — the seven places a model is used, and the registry that enforces it
 
