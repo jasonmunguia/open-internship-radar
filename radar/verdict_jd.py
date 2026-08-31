@@ -99,6 +99,22 @@ def capture(limit=20):
                 "company": q.get("company", ""), "title": q.get("title", ""),
                 "url": url, "ts": v.get("ts", 0), "how": how, "jd": jd,
             }) + "\n")
+    # The writer protects its own output (the 2026-08-10 doctrine): this stage runs
+    # HOURS before the nightly's end-of-run commit, and selfheal resets the clone every
+    # 30 minutes — an uncommitted verdict_jd.jsonl was stash-wiped the very first night
+    # it shipped (2026-08-30: captured 20, gone by morning). Commit immediately; push
+    # failure is tolerated (the nightly's end push retries the same commit).
+    if todo:
+        import subprocess
+        def _git(cmd):
+            return subprocess.run(f"git -C {ROOT} {cmd}", shell=True,
+                                  capture_output=True, text=True, check=False)
+        _git(f"add {OUT}")
+        _git('-c user.name=radar-nightly -c user.email=nightly@local '
+             'commit -q -m "verdict JDs [skip ci]"')
+        p = _git("push -q")
+        if p.returncode != 0:
+            print(f"[verdict_jd] push failed (nightly end-push will retry): {p.stderr[:120]}")
     return {"new": len(todo), "fetched": fetched, "failed": failed,
             "total_captured": len(done) + len(todo)}
 
