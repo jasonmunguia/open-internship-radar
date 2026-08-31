@@ -1,6 +1,6 @@
 # open-internship-radar
 
-I hated wasting time **MANUALLY** searching for the best jobs to apply for & specifically **WHEN**... so I built it for myself (and now you ;) ).
+I hated wasting time **MANUALLY** searching for the best jobs to apply for & specifically **WHEN**... so I built it for myself (<ins>and now you ;)</ins> ).
 
 ### Your inbox
 
