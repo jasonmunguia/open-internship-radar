@@ -1,6 +1,8 @@
 # internship-radar — operating doctrine for agents
 
 Read this before changing anything. These are decisions with reasons, not preferences.
+Then read `LEARNINGS.md` — the incident log that minted these rules; it exists so
+no agent pays for the same lesson twice.
 Read `AGENT_ONBOARDING.md` instead if your job is setting this up for a person.
 
 ## What this system is
