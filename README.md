@@ -30,22 +30,6 @@ your time.
 
 ---
 
-## Why this exists
-
-Two things move an early-career outcome more than anything else you control: **applying in the
-first days a posting is live**, and **a referral**. Competitive roles review on a rolling basis and
-fill before their stated deadline — the deadline is marketing.
-
-Noticing that a req exists, on the day it exists, across hundreds of employers, is a task a person
-loses to a machine. Writing the application is not. So this system does only the first part, and
-does it well, and stays out of the rest.
-
-> **Read [`METHODOLOGY.md`](METHODOLOGY.md) before you configure anything.** It explains *why*
-> each decision was made — including the ones that were wrong first. It is written to be handed
-> to your coding agent so it can adapt the system rather than just run it.
-
----
-
 ## What you get
 
 **Three emails, each with a job**
@@ -122,6 +106,23 @@ already fits. The system widens; you narrow at application time.
 
 **Company tiering from public signals.** Audience size, headcount, and capital raised, taking the
 best of the three — so a well-funded 40-person startup with no audience still surfaces.
+
+---
+
+## Why this exists
+
+The line at the top is the whole thesis. **Match** and **timing** are the two levers you control
+that move an early-career outcome most: competitive roles review on a rolling basis and fill
+before their stated deadline — the deadline is marketing — so applying in the first days a
+posting is live, with a referral already warm (**network**), beats everything else.
+
+Noticing that a req exists, on the day it exists, across hundreds of employers, is a task a person
+loses to a machine. Writing the application is not. So this system does only the machine's part —
+the match, the timing, and the heads-up to go build the network — and stays out of the rest.
+
+> **Read [`METHODOLOGY.md`](METHODOLOGY.md) before you configure anything.** It explains *why*
+> each decision was made — including the ones that were wrong first. It is written to be handed
+> to your coding agent so it can adapt the system rather than just run it.
 
 ---
 
