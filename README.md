@@ -1,5 +1,7 @@
 # open-internship-radar
 
+I hated wasting time manually searching for the best jobs to apply for & specifically WHEN... so I built it for myself (and now you ;) ).
+
 ### Your inbox
 
 Three emails, and only three: a pre-network heads-up before postings go live, the daily
