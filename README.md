@@ -74,6 +74,8 @@ does it well, and stays out of the rest.
 - **Burning alert** — anything above threshold within one poll cycle, after verifying the posting
   is still live.
 
+  ![A burning alert — one role, verified live, with verdict buttons](docs/burning-alert.png)
+
 **A fourth email, and the only way the radar's taste changes.** The three above push work at
 you; this one pulls correction back.
 
