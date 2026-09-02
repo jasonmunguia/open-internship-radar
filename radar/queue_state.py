@@ -8,7 +8,10 @@ the same missing piece: no per-role state.
 States: new -> shown(day N) -> applied. A row leaves the list ONLY when tapped. Nothing
 ages out on its own; the day counter is the pressure instead.
 """
-import hashlib, json, os
+import hashlib
+import json
+import os
+import re
 from datetime import date, datetime
 
 APPLIED = os.path.join(os.path.dirname(__file__), "..", "data", "applied.jsonl")
@@ -134,3 +137,91 @@ def people_search_url(company):
     q = (f'{company} ("Product Manager Intern" OR "APM Intern" OR "Product Management Intern" '
          f'OR "Business Analyst Intern" OR "Strategy Intern" OR "Chief of Staff")')
     return f"https://www.linkedin.com/search/results/people/?keywords={quote(q)}"
+
+
+# ---- role families (2026-09-02): a tap clears the ROLE, not the URL it was tapped from ----
+#
+# job_id() is per-URL by construction (the ledger and shown.json are keyed on it, so it
+# cannot change). But the same requisition reaches the queue from jobright, Simplify,
+# speedrun, GitHub lists AND the company's own page, each with its own URL — so only the
+# tapped copy ever left the list. Three shapes a twin can wear, checked in order of strength:
+#   1. the exact id (unchanged behaviour)
+#   2. the ATS requisition id parsed out of the URL — host-independent, survives mirrors
+#   3. normalised company + title, with the term/season split out so "PM Intern (Summer
+#      2027)" hides "PM Intern" and "PM Intern 2027" but NOT "PM Intern (Fall 2026)"
+
+_REQ = (
+    ("gh",   re.compile(r"[?&](?:gh_jid|token)=(\d+)")),
+    ("gh",   re.compile(r"greenhouse\.io/[^/?#]+/jobs/(\d+)")),
+    ("uuid", re.compile(r"(?:ashbyhq\.com|lever\.co)/[^/]+/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")),
+    ("wd",   re.compile(r"myworkdayjobs\.com/.*_((?:jr|r)?\d{4,})(?=[/?#]|$)")),
+    ("sr",   re.compile(r"smartrecruiters\.com/[^/]+/(\d{10,})")),
+    ("job",  re.compile(r"/job/(\d{6,})(?=[/?#]|$)")),          # Oracle CX + careers.* mirrors
+)
+
+def req_id(url):
+    """Requisition id from an ATS URL, prefixed by ATS family so numeric spaces can't
+    collide. None for aggregators whose ids are per-listing (jobright) and for no-URL rows."""
+    u = (url or "").strip().lower()
+    if not u.startswith("http"):
+        return None
+    for kind, rx in _REQ:
+        m = rx.search(u)
+        if m:
+            return f"{kind}:{m.group(1)}"
+    return None
+
+
+_TERM = re.compile(r"\b(summer|fall|autumn|winter|spring|20[2-3]\d)\b")
+
+def _norm(s):
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", (s or "").lower())).strip()
+
+def role_key(row):
+    """(company, title-without-terms, terms). Emoji, punctuation and case are noise;
+    the term tokens are kept aside because they ARE the difference between two reqs."""
+    co = _norm(row.get("company"))
+    t = _norm(row.get("title"))
+    terms = frozenset(_TERM.findall(t))
+    core = re.sub(r"\s+", " ", _TERM.sub(" ", t)).strip()
+    return co, core, terms
+
+
+def done_state(rows, ids=None):
+    """Everything a tap has cleared, in all three shapes. `rows` is the full queue (a
+    tapped id resolves to its company/title only through the row that carries it);
+    the ledger's own URL covers taps whose row has since left the queue."""
+    ids = set(acted_ids()) if ids is None else set(ids)
+    reqs, keys = set(), {}
+    urls = {}
+    for r in _read_jsonl(APPLIED):
+        urls[r.get("job_id")] = r.get("url", "")
+    for jid in ids:
+        rid = req_id(urls.get(jid, ""))
+        if rid:
+            reqs.add(rid)
+    for r in rows:
+        if job_id(r) not in ids:
+            continue
+        rid = req_id(r.get("url", ""))
+        if rid:
+            reqs.add(rid)
+        co, core, terms = role_key(r)
+        if co and core:
+            keys.setdefault((co, core), []).append(terms)
+    return {"ids": ids, "reqs": reqs, "keys": keys}
+
+
+def is_done(row, done):
+    if job_id(row) in done["ids"]:
+        return True
+    rid = req_id(row.get("url", ""))
+    if rid and rid in done["reqs"]:
+        return True
+    co, core, terms = role_key(row)
+    if not (co and core):
+        return False
+    for t in done["keys"].get((co, core), ()):
+        if t <= terms or terms <= t:    # one term set contains the other (or is empty)
+            return True
+    return False

@@ -379,13 +379,17 @@ def main():
     # QUEUE STATE: a row leaves the apply list only when the operator taps it. Nothing ages out on
     # its own — the "day N" counter is the pressure instead. See radar/queue_state.py.
     from radar import queue_state as qs
-    _done = qs.acted_ids()
-    roles = [r for r in roles if qs.job_id(r) not in _done]
+    # A tap clears the ROLE, not the URL (2026-09-02): the same req reaches the queue
+    # from several boards under several ids, so the applied set is matched as a family —
+    # id, then ATS requisition id, then company+title. See queue_state.done_state.
+    _done = qs.done_state(allrows)
+    roles = [r for r in roles if not qs.is_done(r, _done)]
     # 👍/👎 verdict taps (2026-08-15): a 👎 is a tap, so the row leaves the list —
     # consistent with "rows leave only when tapped". A 👍 keeps the row (the operator
     # still has to apply) and marks it. Mis-taps recover via the flip link, last tap wins.
     _verd = qs.verdicts()
-    roles = [r for r in roles if _verd.get(qs.job_id(r)) != "no"]
+    _no = qs.done_state(allrows, ids={k for k, v in _verd.items() if v == "no"})
+    roles = [r for r in roles if not qs.is_done(r, _no)]
 
     # ---- TIER GATE (2026-08-22 per the operator): every apply recommendation must be T1-T3 ----
     # (or freshly funded). Three layers, in order:

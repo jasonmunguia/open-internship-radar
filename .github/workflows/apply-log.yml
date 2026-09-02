@@ -5,8 +5,11 @@ on:
     types: [radar-click]
 permissions:
   contents: write
-concurrency:
-  group: apply-log          # queue concurrent taps; never two commits racing the same SHA
+# NO concurrency group (2026-09-02). GitHub keeps at most ONE pending run per group and
+# cancels the older pending run when another dispatch arrives — a burst of taps (a digest
+# cleared in ten minutes) lost 16 of 41 on 2026-08-31, before any job started. Serialising
+# is unnecessary: data/*.jsonl carry merge=union in .gitattributes, so concurrent appends
+# rebase cleanly, and the push loop below absorbs the race instead of dropping the tap.
 jobs:
   log:
     runs-on: ubuntu-latest
@@ -36,5 +39,10 @@ jobs:
           git add data/applied.jsonl
           if [ -f data/feedback.jsonl ]; then git add data/feedback.jsonl; fi
           git commit -m "click: ${{ github.event.client_payload.action }} [skip ci]" || exit 0
-          git pull --rebase --autostash -q || true
-          git push -q
+          for i in 1 2 3 4 5 6; do
+            git pull --rebase -q && git push -q && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 2 + RANDOM % 3))
+          done
+          echo "::error::tap NOT persisted after 6 attempts: $P"
+          exit 1
