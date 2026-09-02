@@ -105,10 +105,16 @@ def llm_available(timeout=45):
     """ACTUALLY invoke the CLI. An earlier version returned `shutil.which("claude") is
     not None` — true whenever the binary is on disk, i.e. always — so the digest's defer
     guard never fired once and degraded digests shipped for days. A capability check
-    must exercise the capability, not assert its existence."""
+    must exercise the capability, not assert its existence.
+
+    Pins the eligibility joint's model (2026-09-02): the probe used to inherit the CLI
+    default, and when that default moved to a model the installed CLI was too old for,
+    the probe failed every hour while the opus joints it guards ran fine — a full day of
+    "LLM unavailable" deferrals with nothing actually unavailable. Probe what you gate."""
     try:
-        r = subprocess.run([CLAUDE, "-p", "Reply with exactly: OK"],
-                           capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run([CLAUDE, "-p", "Reply with exactly: OK",
+                            "--model", JOINTS["eligibility"]["model"]],
+                           capture_output=True, text=True, timeout=timeout, check=False)
         return "OK" in (r.stdout or "")
     except Exception:
         return False

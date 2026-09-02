@@ -7,11 +7,13 @@ joint now requires a deliberate registry entry, which is the entire point.
 
 Run locally:  python3 -m tests.test_joints
 """
+import inspect
 import os
 import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from radar import joints
 from radar.joints import JOINTS  # noqa: E402
 
 RADAR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "radar")
@@ -64,3 +66,11 @@ if __name__ == "__main__":
     test_every_joint_has_exactly_one_call_site()
     test_registry_entries_are_complete()
     print(f"joints registry OK: {len(JOINTS)} joints, all registered, all confined")
+
+
+def test_availability_probe_pins_the_model_it_gates():
+    """The probe inherited the CLI default once and deferred a whole day while the opus
+    joints it guards were healthy (2026-09-02). It must name the eligibility model."""
+    src = inspect.getsource(joints.llm_available)
+    assert '"--model", JOINTS["eligibility"]["model"]' in src
+
