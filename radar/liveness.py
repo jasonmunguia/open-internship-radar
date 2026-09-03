@@ -163,8 +163,10 @@ def _judge_batch(batch):
         "laziness. Never infer from posting age or plausibility.\n\n"
         f"POSTINGS:\n{json.dumps(items)}\n\n"
         'Return ONLY a JSON array: [{"i":<idx>,"status":"live|dead|unsure"}]. No prose.')
+    res = None
     try:
-        out = run_joint("liveness", prompt).stdout
+        res = run_joint("liveness", prompt)
+        out = res.stdout
         js = out[out.find("["):out.rfind("]") + 1]
         verdicts = {}
         for v in json.loads(js):
@@ -172,7 +174,12 @@ def _judge_batch(batch):
                 verdicts[batch[int(v["i"])][0]] = v["status"]
         return verdicts, None
     except Exception as ex:
-        return {}, f"{type(ex).__name__}: {ex}"[:120]
+        # Keep what the CLI actually said (2026-09-02): a bare JSONDecodeError deferred a
+        # whole day's digest with no way to tell a usage cap from a prose reply.
+        said = ""
+        if res is not None:
+            said = " | cli: " + ((res.stdout or res.stderr or "").strip().splitlines() or ["<empty>"])[0][:80]
+        return {}, (f"{type(ex).__name__}: {ex}"[:120] + said)
 
 
 def _load():

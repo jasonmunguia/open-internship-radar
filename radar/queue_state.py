@@ -173,6 +173,10 @@ def req_id(url):
 
 
 _TERM = re.compile(r"\b(summer|fall|autumn|winter|spring|20[2-3]\d)\b")
+# Trailing "- New York, NY" / ", Phoenix, AZ" / "(Remote)": location lives in its own
+# field; a title that carries it is one req per city (Amex posts exactly this way), and
+# the city is not the role. Stripped BEFORE normalisation so the state code survives.
+_LOC = re.compile(r"\s*[-–—,(]\s*[A-Za-z. ]+,\s*[A-Z]{2}\)?\s*$|\s*[-–—(]\s*remote\)?\s*$", re.IGNORECASE)
 
 def _norm(s):
     return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", (s or "").lower())).strip()
@@ -181,7 +185,7 @@ def role_key(row):
     """(company, title-without-terms, terms). Emoji, punctuation and case are noise;
     the term tokens are kept aside because they ARE the difference between two reqs."""
     co = _norm(row.get("company"))
-    t = _norm(row.get("title"))
+    t = _norm(_LOC.sub("", row.get("title") or ""))
     terms = frozenset(_TERM.findall(t))
     core = re.sub(r"\s+", " ", _TERM.sub(" ", t)).strip()
     return co, core, terms

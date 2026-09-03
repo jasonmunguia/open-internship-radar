@@ -136,3 +136,31 @@ def test_apply_log_has_no_concurrency_group():
     wf = open(os.path.join(root, ".github", "workflows", "apply-log.yml")).read()
     assert "concurrency:" not in wf
     assert "merge=union" in open(os.path.join(root, ".gitattributes")).read()
+
+
+def test_role_key_strips_trailing_location():
+    a = qs.role_key({"company": "American Express",
+                     "title": "Campus Undergraduate Summer Internship Program - 2027 Product Management, Global Commercial Services - New York, NY"})
+    b = qs.role_key({"company": "American Express",
+                     "title": "Campus Undergraduate Summer Internship Program - 2027 Product Management, Global Commercial Services"})
+    assert a == b
+    # a different team at the same company is still a different role
+    c = qs.role_key({"company": "American Express",
+                     "title": "Campus Undergraduate Summer Internship Program - 2027 Product Management, Global Merchant & Network Services - Phoenix, AZ"})
+    assert c[1] != a[1]
+    assert qs.role_key({"company": "X", "title": "PM Intern (Remote)"})[1] == "pm intern"
+    assert qs.role_key({"company": "X", "title": "PM Intern - Richmond, VA"})[1] == "pm intern"
+    # not a location: a plain hyphenated qualifier survives
+    assert qs.role_key({"company": "X", "title": "PM Intern - Payments"})[1] == "pm intern payments"
+
+
+def test_liveness_error_keeps_what_the_cli_said(monkeypatch):
+    from radar import joints, liveness
+    class R:  # a CompletedProcess whose stdout is prose, not JSON
+        stdout = "You've hit your usage limit.\nTry again later."
+        stderr = ""
+    monkeypatch.setattr(joints, "run_joint", lambda *a, **k: R())   # _judge_batch imports it lazily
+    verdicts, err = liveness._judge_batch([("u1", {"company": "X", "title": "Y", "url": "u1"}, "text")])
+    assert verdicts == {}
+    assert "cli: You've hit your usage limit." in err
+
