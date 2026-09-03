@@ -196,6 +196,27 @@ def report_local_health(status, sent):
     except Exception as ex:
         print(f"[warn] could not publish local heartbeat: {ex}")
 
+def _persist_caches():
+    """The liveness sweep and tier resolver write data/liveness.json and
+    data/company_tiers.json — and nothing committed them (2026-09-02): sync_repo()'s
+    reset at the start of the NEXT run stashed and discarded every verdict, so the cache
+    was the 2026-08-29 snapshot forever, every run re-probed ~500 rows, and the resulting
+    burst is what tripped jobright's bot challenge. Same rule as the nightly: the writer
+    protects its own output. Runs after the sweep, BEFORE any defer return."""
+    try:
+        sh(f"git -C {REPO_DIR} add data/liveness.json data/company_tiers.json")
+        c = sh(f'git -C {REPO_DIR} -c user.name=radar-local -c user.email=radar@local '
+               f'commit -q -m "liveness+tier caches [skip ci]"')
+        if c.returncode != 0:
+            return                      # nothing changed
+        sh(f"git -C {REPO_DIR} pull --rebase -X ours -q")
+        p = sh(f"git -C {REPO_DIR} push -q")
+        if p.returncode != 0:
+            print("[cache] push failed:", p.stderr[:150])
+    except Exception as ex:
+        print(f"[cache] persist failed: {ex}")
+
+
 def _mark_deferred(reason):
     """Record WHY we deferred so the dead-man's-switch tells waiting apart from broken.
 
@@ -446,6 +467,8 @@ def main():
         print(f"[liveness] held {len(_lv_unsure)} unverifiable rows (retry tomorrow): "
               + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _lv_unsure[:15])
               + ("" if len(_lv_unsure) <= 15 else f" … +{len(_lv_unsure) - 15} more"))
+    if not DRY:
+        _persist_caches()               # before the defer below: verdicts outlive the run
     if _lv_q.get("error") and _lv_unsure and not DRY:
         print(f"[defer] liveness checker failed ({_lv_q['error']}) with {len(_lv_unsure)} rows unverified — not sending")
         _mark_deferred(f"liveness checker failed with {len(_lv_unsure)} rows unverified: {_lv_q['error']}")

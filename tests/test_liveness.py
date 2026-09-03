@@ -155,3 +155,14 @@ def test_paced_hosts_leave_the_thread_pool():
     assert [j for j, _ in paced] == ["a", "c"] and [j for j, _ in pooled] == ["b"]
     assert "jobright.ai" in liveness.PACED_HOSTS and liveness.PACE_SECONDS >= 1
 
+
+def test_digest_commits_the_caches_after_the_sweep():
+    """Uncommitted cache files are destroyed by the mirror reset at the next run; the
+    sweep's verdicts must be committed before any defer return (2026-09-02)."""
+    src = open(os.path.join(os.path.dirname(__file__), "..", "radar", "digest.py")).read()
+    assert "add data/liveness.json data/company_tiers.json" in src
+    assert src.index("_persist_caches()
+") > src.index("_live_sweep(roles")
+    assert src.index("_persist_caches()
+") < src.index("TIER GATE (2026-08-22")
+
