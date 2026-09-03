@@ -161,8 +161,7 @@ def test_digest_commits_the_caches_after_the_sweep():
     sweep's verdicts must be committed before any defer return (2026-09-02)."""
     src = open(os.path.join(os.path.dirname(__file__), "..", "radar", "digest.py")).read()
     assert "add data/liveness.json data/company_tiers.json" in src
-    assert src.index("_persist_caches()
-") > src.index("_live_sweep(roles")
-    assert src.index("_persist_caches()
-") < src.index("TIER GATE (2026-08-22")
+    call = src.index("        _persist_caches()")
+    assert call > src.index("_live_sweep(roles")
+    assert call < src.index('if _lv_q.get("error") and _lv_unsure and not DRY:')
 

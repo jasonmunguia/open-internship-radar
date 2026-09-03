@@ -213,7 +213,7 @@ def _persist_caches():
         p = sh(f"git -C {REPO_DIR} push -q")
         if p.returncode != 0:
             print("[cache] push failed:", p.stderr[:150])
-    except Exception as ex:
+    except Exception as ex:  # noqa: BLE001 — a cache commit must never abort the send
         print(f"[cache] persist failed: {ex}")
 
 
