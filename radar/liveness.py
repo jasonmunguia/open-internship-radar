@@ -75,6 +75,14 @@ def classify(status, body, url=""):
 
 
 _JOB_PATH = re.compile(r"/jobs?/[A-Za-z0-9._~-]{4,}")
+# A bot challenge, login wall or captcha is NOT a pulled req (2026-09-02): jobright answers
+# a burst of GETs with a 303 to /_jr/security/challenge?return=<job path>, and the
+# redirect rule below read that as "left the job path" — 96 live rows, 22 of them PwC T1,
+# went permanently dead in one sweep. Anything that looks like a gate escalates instead.
+_CHALLENGE = re.compile(r"/_jr/security/|challenge|captcha|/login|/signin|/auth\b|/verify", re.IGNORECASE)
+# Hosts that rate-limit a parallel burst into that challenge: probed one at a time, spaced.
+PACED_HOSTS = ("jobright.ai",)
+PACE_SECONDS = 1.5
 
 
 def redirected_away(orig, final):
@@ -83,9 +91,12 @@ def redirected_away(orig, final):
     KnowBe4: /jobs/8660687002 302'd to the greenhouse board root with ?error=true."""
     if not final or final == orig:
         return False
+    if _CHALLENGE.search(final):
+        return False                     # a gate in front of the page, not a verdict on it
     if "error=true" in final:
         return True
-    return bool(_JOB_PATH.search(orig or "")) and not _JOB_PATH.search(final)
+    from urllib.parse import unquote
+    return bool(_JOB_PATH.search(orig or "")) and not _JOB_PATH.search(unquote(final))
 
 
 def probe(url, timeout=12):
@@ -113,7 +124,10 @@ def probe(url, timeout=12):
         with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read(300000 if "jobright.ai" in url else 60000).decode("utf-8", "replace")
             status = r.status
-            if redirected_away(url, r.geturl()):
+            final = r.geturl()
+            if final != url and _CHALLENGE.search(final):
+                return "unsure"          # challenged, not judged — layer 2/3 or tomorrow
+            if redirected_away(url, final):
                 return "dead"
     except urllib.error.HTTPError as e:
         return classify(e.code, "", url)
@@ -189,6 +203,13 @@ def _load():
         return {}
 
 
+def _partition(to_check):
+    """(paced, pooled): rows on a PACED_HOST are probed serially, the rest in the pool."""
+    paced = [t for t in to_check if any(h in str(t[1].get("url", "")) for h in PACED_HOSTS)]
+    pooled = [t for t in to_check if t not in paced]
+    return paced, pooled
+
+
 def sweep(rows, allow_network=True):
     """Gate rows on liveness. Returns (live, dead, unsure, quality) where quality is
     {checked, from_cache, error} — callers MUST inspect it (a checker that degrades
@@ -225,9 +246,16 @@ def sweep(rows, allow_network=True):
         cache[jid] = {"status": verdict, "ts": int(now), "url": r.get("url", "")}
         (live if verdict == "live" else dead).append(r)
 
-    # Layer 1 — independent and I/O-bound, so threads (parallel iff reordering is a no-op).
+    # Layer 1 — independent and I/O-bound, so threads (parallel iff reordering is a no-op)
+    # — except PACED_HOSTS, which answer a 12-wide burst with a bot challenge (jobright,
+    # 2026-09-02): those go one at a time with a gap, in the same thread as the caller.
+    paced, pooled = _partition(to_check)
     with ThreadPoolExecutor(max_workers=12) as ex:
-        l1 = list(ex.map(lambda t: (t[0], t[1], probe(t[1].get("url", ""))), to_check))
+        l1 = list(ex.map(lambda t: (t[0], t[1], probe(t[1].get("url", ""))), pooled))
+    for i, (jid, r) in enumerate(paced):
+        if i:
+            time.sleep(PACE_SECONDS)
+        l1.append((jid, r, probe(r.get("url", ""))))
     q["checked"] = len(l1)
     needs_render = []
     for jid, r, v in l1:

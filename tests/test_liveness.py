@@ -122,3 +122,36 @@ def test_sweep_unlinked_row_is_dead_not_held(tmp_path, monkeypatch):
     rows = [_row("Medtronic", url="#"), _row("Palantir Launch", url="")]
     live, dead, unsure, _q = sweep(rows, allow_network=False)
     assert live == [] and unsure == [] and len(dead) == 2
+
+
+# ---- bot challenge is a gate, not a verdict (2026-09-02) ----
+
+def test_challenge_redirect_is_not_away():
+    orig = "https://jobright.ai/jobs/info/6a9608d3c8763a3a87ffe06d?utm_campaign=1063"
+    final = "https://jobright.ai/_jr/security/challenge?return=%2Fjobs%2Finfo%2F6a9608d3c8763a3a87ffe06d"
+    assert liveness.redirected_away(orig, final) is False
+    assert liveness.redirected_away(orig, "https://jobright.ai/login?next=%2Fjobs%2Finfo%2Fabc") is False
+    # the real pulled-req signature still counts
+    assert liveness.redirected_away("https://x.greenhouse.io/co/jobs/8660687002",
+                                    "https://x.greenhouse.io/co?error=true") is True
+
+
+def test_probe_challenge_redirect_is_unsure(monkeypatch):
+    class R:
+        status = 200
+        def read(self, n=None): return b"x" * 3000
+        def geturl(self): return "https://jobright.ai/_jr/security/challenge?return=%2Fjobs%2Finfo%2Fabc"
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+    monkeypatch.setattr(liveness.urllib.request, "urlopen", lambda *a, **k: R())
+    assert probe("https://jobright.ai/jobs/info/abc") == "unsure"
+
+
+def test_paced_hosts_leave_the_thread_pool():
+    rows = [("a", {"url": "https://jobright.ai/jobs/info/1"}),
+            ("b", {"url": "https://boards.greenhouse.io/x/jobs/2"}),
+            ("c", {"url": "https://jobright.ai/jobs/info/3"})]
+    paced, pooled = liveness._partition(rows)
+    assert [j for j, _ in paced] == ["a", "c"] and [j for j, _ in pooled] == ["b"]
+    assert "jobright.ai" in liveness.PACED_HOSTS and liveness.PACE_SECONDS >= 1
+
