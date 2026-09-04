@@ -57,7 +57,23 @@ CLUSTER_MUST_PASS = [
     "Solutions Intern",
     "Product Internship",
     "Operations Interns - Summer",
+    "Commercial Intern",           # "Sales Intern" left this list 2026-09-04: sales/BD titles are out
+]
+
+# titles that must score None end-to-end (family removed + title-excluded, the operator 2026-09-04).
+# gtm / growth / partnerships stay in. Description deliberately carries GTM words so the
+# description-level half-weight fallback cannot smuggle a BD title back in.
+FAMILY_MUST_DROP = [
+    "Business Development Intern",
+    "BD Intern - Summer 2027",
+    "Sales Strategy Intern",
+    "Sales Operations Internship",
     "Sales Intern",
+]
+FAMILY_MUST_KEEP = [
+    "GTM Strategy Intern",
+    "Growth Intern",
+    "Partnerships Intern",
 ]
 
 
@@ -81,8 +97,20 @@ def main():
     for t in CLUSTER_MUST_PASS:
         if not _any(cluster_pats, t):
             failures.append(f"cluster patterns missed a real intern title: {t!r}")
+    from radar.score import score_posting
+    def _score(t):
+        s, _ = score_posting({"title": t, "company": "Palantir", "location": "Denver, CO",
+                              "url": "", "description": "growth partnerships go-to-market"}, profile)
+        return s
+    for t in FAMILY_MUST_DROP:
+        if _score(t) is not None:
+            failures.append(f"sales/BD title WRONGLY scored (should be dropped): {t!r}")
+    for t in FAMILY_MUST_KEEP:
+        if _score(t) is None:
+            failures.append(f"gtm/growth title WRONGLY dropped: {t!r}")
 
-    total = len(MUST_PASS) + len(MUST_REJECT) + len(CLUSTER_MUST_REJECT) + len(CLUSTER_MUST_PASS)
+    total = (len(MUST_PASS) + len(MUST_REJECT) + len(CLUSTER_MUST_REJECT) + len(CLUSTER_MUST_PASS)
+             + len(FAMILY_MUST_DROP) + len(FAMILY_MUST_KEEP))
     if failures:
         print(f"❌ gate patterns FAILED — {len(failures)}/{total} cases wrong:")
         for f in failures:

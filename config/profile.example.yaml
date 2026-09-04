@@ -52,7 +52,8 @@ clusters:
   gtm_bd:
     weight: 40
     angle: gtm
-    patterns: ["go.?to.?market", "gtm", "business development", "\\bbd\\b", "growth", "partnership", "capture", "commercial intern(ship)?s?\\b", "revenue", "sales (strategy|ops|intern(ship)?s?\\b)"]
+    # Business development and sales titles removed 2026-09-04 (and title-excluded below).
+    patterns: ["go.?to.?market", "gtm", "growth", "partnership", "capture", "commercial intern(ship)?s?\\b", "revenue"]
   product:
     weight: 40
     angle: product
@@ -114,6 +115,7 @@ scoring:
   # NB: "full-time" is NOT excluded, because a full-time *internship* is still an internship.
   # NB: plain "manager" is NOT excluded — "Product/Program Manager Intern" are valid. Only senior titles.
   exclude_patterns: ["new grad", "new-grad", "\\bsenior\\b", "\\bstaff\\b",
+    "business development", "\\bbd\\b", "\\bsales\\b",   # sales/BD titles out (2026-09-04)
     "\\bdirector\\b", "\\bhead of\\b", "\\bprincipal\\b", "senior manager", "general manager",
     "\\bvp\\b", "vice president", "\\bmba\\b", "phd", "graduate program",
     # engineering/design/research titles, excluded for a business-side candidate. INVERT THIS
