@@ -636,6 +636,10 @@ def main():
                 # 👍/👎 verdict buttons: relay taps with no destination — they log feedback
                 # and land on a confirmation page, never on the posting. 👍 marks the row;
                 # 👎 removes it tomorrow. Weekly, the taps train the matching (proposals only).
+                # Referral path (2026-09-30): full-time holders of this role at this company.
+                # Plain link, not relayed — tapping it never clears the row.
+                people = qs.ft_people_search_url(r.get("company", ""), r.get("cluster", ""),
+                                                 r.get("title", ""))
                 thumb = " 👍" if _verd.get(qs.job_id(r)) == "yes" else ""
                 ylink = qs.relay("", r, _relay, action="yes")
                 nlink = qs.relay("", r, _relay, action="no")
@@ -652,7 +656,9 @@ def main():
                          f"<br><span style='color:#888;font-size:11px'>{posted} · "
                          f"{md(r.get('location',''))[:35]}{pay}</span>{age}</td>"
                          f"<td style='font-size:12px;color:#444'>{note}</td>"
-                         f"<td><a href='{link}' style='color:#1d4ed8'>apply→</a>{vbtns}</td></tr>")
+                         f"<td><a href='{link}' style='color:#1d4ed8'>apply→</a>"
+                         f"<br><a href='{people}' style='color:#7c3aed;font-size:11px'>find people</a>"
+                         f"{vbtns}</td></tr>")
         h.append("</table>")
     else:
         h.append("<p>No fresh matches today.</p>")

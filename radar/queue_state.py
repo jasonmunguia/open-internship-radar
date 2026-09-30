@@ -139,6 +139,54 @@ def people_search_url(company):
     return f"https://www.linkedin.com/search/results/people/?keywords={quote(q)}"
 
 
+# Full-time titles per role family (2026-09-30): the referral ask goes to the
+# people who hold the job full-time, not to other interns. Keyed on score.py's cluster.
+FT_TITLES = {
+    "product":     ("Product Manager", "Associate Product Manager", "Technical Program Manager",
+                    "Product Operations"),
+    "consulting":  ("Business Analyst", "Consultant", "Strategy Analyst"),
+    "cos_bizops":  ("Chief of Staff", "Business Operations", "Strategy & Operations",
+                    "Corporate Strategy"),
+    "gtm_bd":      ("Business Development", "Partnerships", "Go-to-Market", "Growth"),
+    "vc":          ("Investor", "Associate", "Principal"),
+    "ops_supply":  ("Program Manager", "Operations Manager", "Supply Chain"),
+    "deployment":  ("Deployment Strategist", "Forward Deployed", "Implementation",
+                    "Solutions", "Customer Success"),
+}
+_INTERN_NOISE = re.compile(
+    r"\[.*?\]|\b(summer|fall|winter|spring|20\d\d|intern(ship)?s?|co-?op|student|"
+    r"undergrad(uate)?|mba)\b", re.IGNORECASE)
+_TITLE_SPLIT = re.compile(r"[-–—|,:/(]")
+
+
+def title_core(title):
+    """The job itself, minus the intern/season wrapper: the first segment that still has
+    words once those are stripped. 'Summer 2027 Intern - Starlink Business Operations' ->
+    'Starlink Business Operations'. Over four words is a program name, not a job title a
+    person holds, so it returns '' and the family titles carry the search alone."""
+    for seg in _TITLE_SPLIT.split(title or ""):
+        core = " ".join(_INTERN_NOISE.sub(" ", seg.replace(")", " ")).split())
+        if core:
+            return core if len(core.split()) <= 4 else ""
+    return ""
+
+
+def ft_people_search_url(company, cluster="", title=""):
+    """LinkedIn people search for FULL-TIME holders of this row's role at this company —
+    the referral path for a posting already on the apply list. The posting's own title
+    (intern wrapper stripped) leads, then the family's full-time titles widen it. Plain
+    link, never relayed: tapping it must not clear the row."""
+    from urllib.parse import quote
+    company = re.sub(r"\s*\(.*?\)", "", company or "")           # parens break the boolean query
+    company = " ".join(re.sub(r"[^\w\s&.'-]", " ", company).split())  # badge glyphs: "Bosch ✓"
+    core = title_core(title)
+    titles = ([core] if core else []) + \
+        [t for t in FT_TITLES.get(cluster, ()) if t.lower() != core.lower()]
+    q = company if not titles else \
+        f'{company} ({" OR ".join(chr(34) + t + chr(34) for t in titles)})'
+    return f"https://www.linkedin.com/search/results/people/?keywords={quote(q)}"
+
+
 # ---- role families (2026-09-02): a tap clears the ROLE, not the URL it was tapped from ----
 #
 # job_id() is per-URL by construction (the ledger and shown.json are keyed on it, so it
