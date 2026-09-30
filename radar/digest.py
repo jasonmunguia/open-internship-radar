@@ -432,7 +432,8 @@ def main():
             from radar.tiers import backfill as _tier_backfill, resolve_unresolved_with_claude as _tier_claude
             _tier_backfill([r["company"] for r in _unverified], cache=_tcache,
                            limit=int(os.environ.get("IR_DIGEST_BACKFILL_LIMIT", "40")))
-            _res_err = (_tier_claude() or {}).get("error")
+            # Held rows' companies jump the slug queue — they are what is waiting on it.
+            _res_err = (_tier_claude(priority=[r["company"] for r in _unverified]) or {}).get("error")
         except Exception as ex:
             _res_err = f"{type(ex).__name__}: {ex}"[:120]
         _tcache = _load_tier_cache()   # both resolvers persist to the cache file

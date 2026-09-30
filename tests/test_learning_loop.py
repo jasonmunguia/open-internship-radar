@@ -52,7 +52,7 @@ def test_weekly_send_then_await(monkeypatch):
     assert ll.run(NOW).startswith("weekly check-in sent")
     assert len(sent) == 1
     # same night again: awaiting, not re-sent, no follow-up (cadence not reached)
-    monkeypatch.setattr(ll, "check_reply", lambda aw: None)
+    monkeypatch.setattr(ll, "check_replies", lambda aw: [])
     assert ll.run(NOW + 60).startswith("awaiting reply")
     assert len(sent) == 1
 
@@ -60,7 +60,7 @@ def test_weekly_send_then_await(monkeypatch):
 def test_daily_followup_until_reply(monkeypatch):
     _tmp(monkeypatch)
     sent = _capture_send(monkeypatch)
-    monkeypatch.setattr(ll, "check_reply", lambda aw: None)
+    monkeypatch.setattr(ll, "check_replies", lambda aw: [])
     ll.run(NOW)
     assert ll.run(NOW + 26 * 3600).startswith("follow-up #1")     # next calendar day
     assert ll.run(NOW + 50 * 3600).startswith("follow-up #2")     # the day after
@@ -74,7 +74,7 @@ def test_followup_fires_next_morning_not_24h_later(monkeypatch):
     following night — 33h after the ask, skipping a day he expected to hear on."""
     _tmp(monkeypatch)
     _capture_send(monkeypatch)
-    monkeypatch.setattr(ll, "check_reply", lambda aw: None)
+    monkeypatch.setattr(ll, "check_replies", lambda aw: [])
     import time as _t
     evening = int(_t.mktime(_t.strptime("2026-08-15 16:56", "%Y-%m-%d %H:%M")))
     next_nightly = int(_t.mktime(_t.strptime("2026-08-16 02:10", "%Y-%m-%d %H:%M")))
@@ -88,8 +88,8 @@ def test_reply_ingested_and_loop_stops(monkeypatch):
     ll.run(NOW)
     reply = {"ts": NOW + 3600, "from": "the operator <j@example.edu>", "token": "LRN-x",
              "text": "drop all defense below T2"}
-    monkeypatch.setattr(ll, "check_reply", lambda aw: reply)
-    assert ll.run(NOW + 7200).startswith("reply received")
+    monkeypatch.setattr(ll, "check_replies", lambda aw: [reply])
+    assert ll.run(NOW + 7200).startswith("1 reply received")
     saved = [json.loads(l) for l in open(ll.REPLIES)]
     assert saved[0]["text"] == "drop all defense below T2"
     # loop is closed: next night is a plain weekly-gate skip, nothing sent
@@ -104,7 +104,7 @@ def test_imap_outage_withholds_followup(monkeypatch):
 
     def boom(aw):
         raise OSError("imap.gmail.com unreachable")
-    monkeypatch.setattr(ll, "check_reply", boom)
+    monkeypatch.setattr(ll, "check_replies", boom)
     assert ll.run(NOW + 30 * 3600).startswith("imap outage")
     assert len(sent) == 1          # no blind nag
 
@@ -121,4 +121,36 @@ def test_own_mail_not_a_reply(monkeypatch):
     import types
     fake = types.SimpleNamespace(resolve=lambda a: "me@gmail.test")
     monkeypatch.setitem(sys.modules, "mailer", fake)
-    assert ll.check_reply({"token": "LRN-x", "sent_ts": NOW - 60}) is None
+    assert ll.check_replies({"token": "LRN-x", "sent_ts": NOW - 60}) == []
+
+
+def test_every_reply_ingested(monkeypatch):
+    """Two replies to one check-in (an answer, then an addendum minutes later) are BOTH
+    kept, oldest first. The loop used to close on the first and drop the second."""
+    _tmp(monkeypatch)
+    _capture_send(monkeypatch)
+    ll.run(NOW)
+    monkeypatch.setattr(ll, "_search_inbox", lambda token, since_ts: [
+        {"from": "Jane Q. Doe <jane@example.edu>", "ts": NOW + 900,
+         "text": "and the big-4 ones, not all of them\n*Jane Q. Doe*\nFounder, Acme"},
+        {"from": "me@gmail.test", "ts": NOW + 100, "text": "nudge body"},
+        {"from": "Jane Q. Doe <jane@example.edu>", "ts": NOW + 600,
+         "text": "right on 1-4, wrong on 5\n> quoted check-in\n*Jane Q. Doe*\nFounder, Acme"},
+    ])
+    import types
+    monkeypatch.setitem(sys.modules, "mailer", types.SimpleNamespace(resolve=lambda a: "me@gmail.test"))
+    assert ll.run(NOW + 7200).startswith("2 replies received")
+    saved = [json.loads(l) for l in open(ll.REPLIES)]
+    assert [r["text"] for r in saved] == ["right on 1-4, wrong on 5",
+                                          "and the big-4 ones, not all of them"]
+    assert "awaiting" not in json.load(open(ll.STATE))
+
+
+def test_strip_signature():
+    sig = "keep this\nand this\n*Jane Q. Doe*\nCOO @ Acme\n<https://acme.test>"
+    assert ll.strip_signature(sig, "JANE DOE <jane@example.edu>") == "keep this\nand this"
+    assert ll.strip_signature("words\n--\nsig block", "x@y.z") == "words"
+    # the sender's name in the FIRST line is content, not a signature
+    assert ll.strip_signature("Jane here, one more thing", "Jane Doe <j@x.y>") == \
+        "Jane here, one more thing"
+    assert ll.strip_signature("no signature at all", "") == "no signature at all"

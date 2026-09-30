@@ -119,11 +119,18 @@ def _key(company):
     return re.sub(r"[^a-z0-9]", "", company.lower())
 
 
+# Legal-entity forms only — NOT "group"/"holdings", which name different companies often
+# enough ("Apex" the space startup vs "Apex Group" the fund administrator).
+_LEGAL_FORMS = ("inc", "incorporated", "corp", "corporation", "llc", "ltd", "co", "company", "plc")
+
+
 def _key_candidates(company):
     """Cache keys to try, most specific first. Resolves 'Uber Freight' -> 'uber' so a
-    division inherits its parent's band instead of falling through to `pending`."""
+    division inherits its parent's band instead of falling through to `pending`, and
+    'Caterpillar' -> 'caterpillarinc' so a bare name finds the same company's measured
+    entry when its own key is stuck unresolved (both entries exist in the cache)."""
     k = _key(company)
-    out = [k, _PARENT.get(k, "")]
+    out = [k, _PARENT.get(k, "")] + [k + f for f in _LEGAL_FORMS]
     words = re.sub(r"[^a-z0-9 ]", "", company.lower()).split()
     for i in range(len(words) - 1, 0, -1):          # progressively drop trailing words
         if words[i] in _SUFFIXES or i == len(words) - 1:
@@ -131,6 +138,35 @@ def _key_candidates(company):
             out.append(cand)
             out.append(_PARENT.get(cand, ""))
     return [c for i, c in enumerate(out) if c and c not in out[:i]]
+
+
+# Parenthetical tails that are not a parent company.
+_NOT_A_PARENT = {"us", "usa", "u.s.", "uk", "remote", "hybrid", "global", "contract"}
+
+
+def explicit_parent(company):
+    """The parent a company string names itself — "Solar Turbines (Caterpillar)",
+    "Allergan Aesthetics, an AbbVie Company", "X, a subsidiary of Y" — or None.
+    Distinct from _PARENT (a hand map for divisions whose names hide the parent):
+    here the posting SAYS who the parent is, so no guessing is involved. A
+    parenthetical that is the name's own acronym ("Boston Consulting Group (BCG)")
+    is not a parent."""
+    c = (company or "").strip()
+    m = re.search(r",?\s+an?\s+(.+?)\s+company\s*$", c, re.I)
+    if m:
+        return m.group(1).strip()
+    m = re.search(r"\b(?:subsidiary|division|part|unit) of\s+(.+?)\s*\)?\s*$", c, re.I)
+    if m:
+        return m.group(1).strip(" ()")
+    m = re.search(r"^(.+?)\s*\(([^()]+)\)\s*$", c)
+    if m:
+        outer, inner = m.group(1), m.group(2).strip()
+        initials = "".join(w[0] for w in re.findall(r"[A-Za-z0-9]+", outer)).lower()
+        if (len(inner) > 1 and inner.lower() != initials and _key(inner) != _key(outer)
+                and inner.lower() not in _NOT_A_PARENT
+                and not inner.lower().startswith(("formerly", "acquired"))):
+            return inner
+    return None
 
 
 def name_match(token, company_lower):
@@ -175,6 +211,7 @@ def band_for(company, profile, funded=None, allow_fetch=False, cache=None):
             raise_usd = hit and hit.get("amount")
         except Exception:
             pass
+    best = None
     for k in _key_candidates(company):
         hit = cache.get(k)
         if hit and not hit.get("needs_resolution"):
@@ -182,7 +219,19 @@ def band_for(company, profile, funded=None, allow_fetch=False, cache=None):
             # every read and the better band wins, so a fresh round promotes immediately
             # instead of waiting out the 180-day TTL.
             b = min(hit["band"], band_from_signals(None, None, raise_usd))
-            return b, BAND_POINTS[b], "cache" if k == _key(company) else "cache:parent"
+            best = (b, "cache" if k == _key(company) else "cache:parent")
+            break
+    # A subsidiary the posting itself ties to a parent sits at the parent's caliber when
+    # that is better (2026-09-30 per the operator, check-in LRN-20260823 #6): "Solar Turbines
+    # (Caterpillar)" was stuck at unknown while Caterpillar is a household name. Best of
+    # the two, never worse — the subsidiary's own measured band still counts.
+    parent = explicit_parent(company)
+    if parent:
+        pb, _pts, psrc = band_for(parent, profile, cache=cache)
+        if psrc != "pending" and (best is None or pb < best[0]):
+            best = (pb, f"parent:{psrc}")
+    if best:
+        return best[0], BAND_POINTS[best[0]], best[1]
     k = _key(company)
     if allow_fetch:
         f, e, slug = scrape_linkedin(company)
@@ -270,7 +319,7 @@ def resolve(company):
     return (f, e, slug, "search") if slug else (None, None, None, "unresolved")
 
 
-def resolve_unresolved_with_claude(limit=25, timeout=900):
+def resolve_unresolved_with_claude(limit=25, timeout=900, priority=None):
     """Consume the needs_resolution queue. Deterministic resolution already failed twice here
     (slug guesses, then a search-engine lookup), so what is left needs judgment: which of
     several same-named companies is the real one, or what a company renamed itself to.
@@ -282,7 +331,16 @@ def resolve_unresolved_with_claude(limit=25, timeout=900):
 
     from radar.joints import run_joint
     cache = load_cache()
-    pending = [v["company"] for v in cache.values() if v.get("needs_resolution")][:limit]
+    pending = [v["company"] for v in cache.values() if v.get("needs_resolution")]
+    # `priority` (company names, most important first) jumps the queue; everything else
+    # keeps cache order behind it. The queue is ~290 deep at 25 a night, so without this a
+    # household name (Caterpillar) waited behind the long tail for over a week.
+    if priority:
+        rank = {}
+        for i, c in enumerate(priority):
+            rank.setdefault(_key(c), i)
+        pending.sort(key=lambda c: rank.get(_key(c), len(rank)))
+    pending = pending[:limit]
     if not pending:
         return {"resolved": 0, "pending": 0}
 

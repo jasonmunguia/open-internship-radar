@@ -18,7 +18,10 @@ REPORT = os.path.join(ROOT, "data", "nightly.json")
 def _companies_from_queue():
     """Every company the radar has actually seen — the real backfill target list. Sourced from
     the live queue rather than sources.yaml, because a board we poll is not the same thing as
-    a company that has ever posted a role we care about."""
+    a company that has ever posted a role we care about. Ordered by how many queue rows each
+    company has, most first: a big employer posts many roles, so row count puts the
+    recognisable names at the front of the 150-a-night backfill and the slug-resolution
+    queue instead of behind the long tail (2026-09-30 per the operator, check-in #6)."""
     names = []
     try:
         with open(os.path.join(ROOT, "data", "queue.jsonl")) as fh:
@@ -31,7 +34,9 @@ def _companies_from_queue():
                     continue
     except FileNotFoundError:
         pass
-    return list(dict.fromkeys(names))
+    from collections import Counter
+    counts = Counter(names)
+    return sorted(counts, key=lambda c: -counts[c])     # stable: ties keep first-seen order
 
 
 def _stage(name, fn, report):
@@ -61,8 +66,13 @@ def main():
         return bf(_companies_from_queue(), limit=int(os.environ.get("IR_BACKFILL_LIMIT", "150")))
 
     def slugs():
-        from radar.tiers import resolve_unresolved_with_claude
-        return resolve_unresolved_with_claude()
+        import yaml
+        from radar.tiers import override_band, resolve_unresolved_with_claude
+        profile = yaml.safe_load(open(os.path.join(ROOT, "config", "profile.yaml")))
+        # Hand-listed companies are banded by override no matter what the slug says —
+        # a priority slot spent on Disney is a slot a real unknown did not get.
+        return resolve_unresolved_with_claude(priority=[
+            c for c in _companies_from_queue() if override_band(c, profile) is None])
 
     def discovery():
         from radar.discover import discover

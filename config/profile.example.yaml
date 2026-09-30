@@ -71,6 +71,14 @@ clusters:
     weight: 40
     angle: ops_deployment
     patterns: ["supply chain", "operations intern(ship)?s?\\b", "program manage", "project manage"]
+    # Optional on ANY family — carve content OUT of it. A title matching `exclude` cannot join
+    # this family (neither by title nor by the half-weight description match) unless the
+    # company's industry (see `industries` below) is in `exempt_industries` or
+    # `exempt_patterns` hits the title or company name. Other families can still claim the
+    # title. Example: keep supply-chain roles only at robotics/space/defense companies —
+    # exclude: ["supply chain", "logistic", "warehouse", "inventor(y|ies)"]
+    # exempt_industries: [defense, space, robotics]
+    # exempt_patterns: ["robot", "aerospace", "\\bspace\\b"]
 
 # Company tiers (case-insensitive word-boundary match on company name — "cia" matches
 # "CIA" but not "Financial"; see radar/tiers.py name_match)

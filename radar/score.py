@@ -160,6 +160,25 @@ def classify_industry(company, source, profile):
     return "startup_other"
 
 
+def _blocked_clusters(title, company, source, profile):
+    """Families this title is carved out of. A cluster's optional `exclude` patterns veto
+    it for matching titles, unless the company's industry is in `exempt_industries` or
+    `exempt_patterns` hits the title or company name. The exemption exists because a
+    word is not a job: supply-chain roles at Kroger and at a rocket company are the same
+    title and different seats (per operator verdicts, 2026-09-30)."""
+    blocked = set()
+    for name, c in (profile.get("clusters") or {}).items():
+        if not c.get("exclude") or not _any(c["exclude"], title):
+            continue
+        if c.get("exempt_industries") and \
+                classify_industry(company, source or "", profile) in c["exempt_industries"]:
+            continue
+        if c.get("exempt_patterns") and _any(c["exempt_patterns"], f"{title} {company}"):
+            continue
+        blocked.add(name)
+    return blocked
+
+
 _UNMATCHED = os.path.join(os.path.dirname(__file__), "..", "data", "dropped_unmatched.jsonl")
 
 
@@ -198,14 +217,24 @@ def score_posting(posting, profile, funded=None, tier_cache=None):
     if _any(excludes, title):
         return None, None
 
+    # A family can carve content OUT of itself (optional `exclude` on a cluster): a title
+    # that hits it cannot join that family at title OR description level — otherwise the
+    # half-weight description fallback below would readmit the exact row the family just
+    # refused. Other families still get their shot, so a "Tax ... Product Management" title
+    # ships as product even though consulting refuses tax work.
+    blocked = _blocked_clusters(title, company, posting.get("source", ""), profile)
     best_cluster, best_weight = None, 0
     for name, c in profile["clusters"].items():
+        if name in blocked:
+            continue
         if _any(c["patterns"], title) or _any(c["patterns"], posting.get("department", "")):
             if c["weight"] > best_weight:
                 best_cluster, best_weight = name, c["weight"]
     if best_cluster is None:
         # description-level cluster match at half weight
         for name, c in profile["clusters"].items():
+            if name in blocked:
+                continue
             if _any(c["patterns"], text) and c["weight"] / 2 > best_weight:
                 best_cluster, best_weight = name, c["weight"] / 2
 

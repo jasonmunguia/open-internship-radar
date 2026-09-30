@@ -92,6 +92,25 @@ def strip_quoted(text):
     return "\n".join(keep).strip()
 
 
+def strip_signature(text, sender=""):
+    """His words without his email signature. Cuts at an RFC "-- " delimiter, or at the
+    first line after the opening that carries the sender's own display name — how
+    nearly every signature starts ("*Jane Q. Doe*"). A signature is not guidance, and
+    until 2026-09-30 it reached the pattern joint verbatim with every reply."""
+    name = re.sub(r"<[^>]*>", "", sender or "").strip().strip('"')
+    tokens = [t.lower() for t in re.findall(r"[A-Za-z]{2,}", name)]
+    lines = (text or "").splitlines()
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if s == "--":
+            return "\n".join(lines[:i]).strip()
+        if i > 0 and len(tokens) >= 2 and len(s) <= 60:
+            low = s.lower()
+            if tokens[0] in low and tokens[-1] in low:
+                return "\n".join(lines[:i]).strip()
+    return (text or "").strip()
+
+
 def _load_patterns():
     try:
         d = json.load(open(PATTERNS))
@@ -132,22 +151,27 @@ def compose(now=None):
     return token, subject, "".join(h)
 
 
-def check_reply(awaiting):
-    """His reply, or None. Raises on transport failure — run() turns that into a
-    reported outage instead of a blind follow-up."""
+def check_replies(awaiting):
+    """EVERY reply to this check-in, oldest first ([] when none). Raises on transport
+    failure — run() turns that into a reported outage instead of a blind follow-up.
+    All of them, not the first: the loop closes on ingest, so a second reply sent
+    minutes later (a correction, an addendum) was never read — found 2026-09-30 when
+    a two-message answer would have lost its second half. Renamed from check_reply
+    in the same commit, because the singular name described the bug."""
     from radar.settings import SEND_AS
     import sys
     sys.path.insert(0, os.path.expanduser("~/.claude/tools"))
     import mailer
     own = mailer.resolve(SEND_AS).lower()
+    out = []
     for m in _search_inbox(awaiting["token"], awaiting["sent_ts"]):
         if own in (m.get("from") or "").lower():
             continue                            # our own check-in/follow-up, not a reply
-        text = strip_quoted(m.get("text", ""))
+        text = strip_signature(strip_quoted(m.get("text", "")), m.get("from", ""))
         if text:
-            return {"ts": m.get("ts", 0), "from": m.get("from", ""),
-                    "token": awaiting["token"], "text": text}
-    return None
+            out.append({"ts": m.get("ts", 0), "from": m.get("from", ""),
+                        "token": awaiting["token"], "text": text})
+    return sorted(out, key=lambda r: r["ts"] or 0)
 
 
 def run(now=None):
@@ -158,16 +182,18 @@ def run(now=None):
     aw = st.get("awaiting")
     if aw:
         try:
-            reply = check_reply(aw)
+            replies = check_replies(aw)
         except Exception as ex:
             return f"imap outage ({type(ex).__name__}: {ex}) — follow-up withheld"
-        if reply:
+        if replies:
             with open(REPLIES, "a") as fh:
-                fh.write(json.dumps(reply) + "\n")
+                for r in replies:
+                    fh.write(json.dumps(r) + "\n")
             st.pop("awaiting", None)
-            st["last_reply_ts"] = reply["ts"] or now
+            st["last_reply_ts"] = replies[-1]["ts"] or now
             _save_state(st)
-            return f"reply received for {reply['token']} ({len(reply['text'])} chars) — ingested"
+            return (f"{len(replies)} repl{'y' if len(replies) == 1 else 'ies'} received for "
+                    f"{aw['token']} ({sum(len(r['text']) for r in replies)} chars) — ingested")
         if _day(now) > _day(aw.get("last_contact_ts", 0)):
             token, subject, body = compose(now)
             days = max(1, (now - aw["sent_ts"]) // 86400)

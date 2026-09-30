@@ -54,12 +54,18 @@ def test_verdicts_last_tap_wins(monkeypatch):
 # ---- analysis gates: every skip states why, and no model call is reached ----
 
 def _write_feedback(path, n, span_days):
+    """n verdicts over span_days, each with a queue row beside it (queue.jsonl in the
+    same dir) — a verdict no record can name is not evidence and is left out."""
     base = 1_700_000_000
-    with open(path, "w") as fh:
+    queue = os.path.join(os.path.dirname(path), "queue.jsonl")
+    with open(path, "w") as fh, open(queue, "w") as qh:
         for i in range(n):
+            row = {"company": f"Co{i}", "title": f"Analyst Intern {i}",
+                   "url": f"https://jobs.example.com/{i}"}
+            qh.write(json.dumps(row) + "\n")
             ts = base + (i * span_days * 86400) // max(n - 1, 1)
-            fh.write(json.dumps({"job_id": f"id{i}", "action": "no" if i % 2 else "yes",
-                                 "ts": ts}) + "\n")
+            fh.write(json.dumps({"job_id": queue_state.job_id(row),
+                                 "action": "no" if i % 2 else "yes", "ts": ts}) + "\n")
 
 def test_gate_too_few_verdicts(monkeypatch):
     with tempfile.TemporaryDirectory() as td:
@@ -90,6 +96,51 @@ def test_gate_no_new_verdicts(monkeypatch):
         monkeypatch.setattr(feedback_analysis, "OUT", out)
         monkeypatch.setattr(feedback_analysis, "REPLIES", os.path.join(td, "replies.jsonl"))
         assert feedback_analysis.run() == "skip: no new verdicts or check-in replies since last analysis"
+
+
+# ---- the verdict join: every tap reaches the joint with facts, or is counted out ----
+
+def _join_env(monkeypatch, td):
+    from radar import verdict_jd
+    for mod, name, fn in [(feedback_analysis, "FEEDBACK", "feedback.jsonl"),
+                          (feedback_analysis, "QUEUE", "queue.jsonl"),
+                          (verdict_jd, "OUT", "verdict_jd.jsonl")]:
+        monkeypatch.setattr(mod, name, os.path.join(td, fn))
+    monkeypatch.setattr(feedback_analysis, "_rules_now", lambda: (lambda row: "excluded"))
+    return verdict_jd
+
+
+def test_join_falls_back_to_capture_when_row_left_queue(monkeypatch):
+    """A row a later rule removed from the queue still has its tap-time identity in
+    verdict_jd.jsonl. Before 2026-09-30 such verdicts reached the joint blank."""
+    with tempfile.TemporaryDirectory() as td:
+        vj = _join_env(monkeypatch, td)
+        open(feedback_analysis.QUEUE, "w").close()             # the row is gone
+        with open(feedback_analysis.FEEDBACK, "w") as fh:
+            fh.write(json.dumps({"job_id": "gone1", "action": "no", "ts": 5}) + "\n")
+        with open(vj.OUT, "w") as fh:
+            fh.write(json.dumps({"job_id": "gone1", "company": "AbbVie",
+                                 "title": "Pharmaceutical Sales Intern", "jd": ""}) + "\n")
+        joined, _first, _last, unresolved = feedback_analysis._evidence()
+        assert unresolved == 0 and len(joined) == 1
+        assert joined[0]["company"] == "AbbVie"
+        assert joined[0]["title"] == "Pharmaceutical Sales Intern"
+        assert joined[0]["rules_now"] == "excluded"
+
+
+def test_unresolvable_taps_left_out_and_counted(monkeypatch):
+    """Test taps ("test-verify", "t") name no row anywhere: not evidence, but counted —
+    a silent drop would look exactly like a lost verdict."""
+    with tempfile.TemporaryDirectory() as td:
+        _join_env(monkeypatch, td)
+        open(feedback_analysis.QUEUE, "w").close()
+        with open(feedback_analysis.FEEDBACK, "w") as fh:
+            for jid in ("test-verify", "t"):
+                fh.write(json.dumps({"job_id": jid, "action": "yes", "ts": 1}) + "\n")
+        joined, _first, _last, unresolved = feedback_analysis._evidence()
+        assert joined == [] and unresolved == 2
+        monkeypatch.setattr(feedback_analysis, "OUT", os.path.join(td, "out.json"))
+        assert feedback_analysis.run() == "skip: 0 verdicts < 10 (2 unresolvable taps left out)"
 
 
 if __name__ == "__main__":
