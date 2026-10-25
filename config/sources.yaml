@@ -109,6 +109,9 @@ ats:
   # Household-name corporates verified 2026-07-26 (public JSON APIs — no scraping)
   # Walled (Apple/Google/Meta/Microsoft/Qualcomm/AMD/Cisco/Oracle/IBM/Goldman/JPM/Walmart/Citadel/Jane St/Two Sigma) stay covered via job-list repos
   - {name: Nvidia, ats: workday, token: "nvidia@wd5/NVIDIAExternalCareerSite"}
+  # Direct feeds added 2026-10-25: Microsoft PCSX JSON + Apple internships page.
+  - {name: Microsoft, ats: microsoft, token: ""}
+  - {name: Apple, ats: apple, token: ""}
   - {name: Salesforce, ats: workday, token: "salesforce@wd12/External_Career_Site"}
   - {name: Adobe, ats: workday, token: "adobe@wd5/external_experienced"}
   - {name: Intel, ats: workday, token: "intel@wd1/External"}

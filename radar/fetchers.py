@@ -100,7 +100,11 @@ def fetch_workday(company, token):
     url = f"https://{tenant}.{host}.myworkdayjobs.com/wday/cxs/{tenant}/{site}/jobs"
     base = f"https://{tenant}.{host}.myworkdayjobs.com/en-US/{site}"
     out = []
-    for offset in range(0, 100, 20):
+    # Paginate to the reported total (cap 600). The old fixed 100-row window was full for
+    # Nvidia (exactly 100 "intern" hits, relevance-sorted), so anything past it never arrived.
+    total = 100
+    offset = 0
+    while offset < min(total, 600):
         data = json.loads(_post_hdr(url, {"appliedFacets": {}, "limit": 20, "offset": offset, "searchText": "intern"},
                                     {"User-Agent": UA["User-Agent"], "Content-Type": "application/json",
                                      "Accept": "application/json"}))
@@ -112,8 +116,13 @@ def fetch_workday(company, token):
                         "location": j.get("locationsText", ""),
                         "url": base + j.get("externalPath", ""),
                         "department": "", "posted_at": "", "source": f"workday:{tenant}"})
-        if len(jp) < 20:
+        if offset == 0:
+            total = int(data.get("total") or 100)
+        # Results are relevance-sorted and "intern" also matches "International": once a
+        # whole page carries no intern title, the real hits are exhausted.
+        if len(jp) < 20 or not any(re.search(r"\bintern", j.get("title", ""), re.I) for j in jp):
             break
+        offset += 20
     return out
 
 def fetch_smartrecruiters(company, org):
@@ -479,6 +488,91 @@ def fetch_github_repo(repo, branches=("main", "dev", "master")):
                     "url": link, "department": "", "source": f"github:{repo}"})
     return out
 
+def fetch_microsoft(company="Microsoft"):
+    """Microsoft careers (Eightfold PCSX search) — keyless JSON, US intern postings newest
+    first. Added 2026-10-25: Microsoft had no direct source, only GitHub lists. The API
+    answers a burst with plain-text "Please try again later", so pages are paced and a
+    throttled page is retried once after a pause."""
+    import urllib.parse, time as _t
+    out, seen = [], set()
+    for start in range(0, 200, 10):
+        url = ("https://apply.careers.microsoft.com/api/pcsx/search?domain=microsoft.com"
+               f"&query=intern&location={urllib.parse.quote('United States')}"
+               f"&start={start}&sort_by=timestamp")
+        data = None
+        for attempt in range(2):
+            raw = _get(url)
+            try:
+                data = json.loads(raw).get("data") or {}
+                break
+            except ValueError:
+                if attempt == 0:
+                    _t.sleep(8)
+        if data is None:
+            if not out:
+                raise RuntimeError("microsoft pcsx throttled")
+            break
+        positions = data.get("positions") or []
+        for j in positions:
+            pid = j.get("id")
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            ts = j.get("postedTs")
+            out.append({"company": company, "title": j.get("name", ""),
+                        "location": "; ".join(j.get("standardizedLocations") or j.get("locations") or []),
+                        "url": f"https://apply.careers.microsoft.com/careers/job/{pid}",
+                        "department": j.get("department", ""),
+                        "posted_at": time.strftime("%Y-%m-%d", time.gmtime(ts)) if ts else "",
+                        "source": "microsoft"})
+        if len(positions) < 10 or start + 10 >= int(data.get("count") or 0):
+            break
+        _t.sleep(1.5)
+    return out
+
+def fetch_apple(company="Apple"):
+    """Apple's US internships search page. Server-rendered: the full result set rides in
+    window.__staticRouterHydrationData, so a plain GET works — no CSRF token, no API key.
+    Apple lists one row per location for the same positionId; collapse to one per req."""
+    import time as _t
+    out, by_pid = [], {}
+    for page in range(1, 6):
+        html = _get("https://jobs.apple.com/en-us/search?team=internships-STDNT-INTRN"
+                    f"&location=united-states-USA&sort=newest&page={page}")
+        m = re.search(r'__staticRouterHydrationData\s*=\s*JSON\.parse\("', html)
+        if not m:
+            break
+        end = html.find('");', m.end())
+        data = json.loads(json.loads('"' + html[m.end():end] + '"'))
+        stack, search = [data], None
+        while stack and search is None:
+            o = stack.pop()
+            if isinstance(o, dict):
+                if "searchResults" in o:
+                    search = o
+                else:
+                    stack.extend(o.values())
+            elif isinstance(o, list):
+                stack.extend(o)
+        results = (search or {}).get("searchResults") or []
+        for j in results:
+            pid = j.get("positionId")
+            locs = [l.get("name", "") for l in j.get("locations") or [] if l.get("name")]
+            if pid in by_pid:
+                by_pid[pid]["location"] = "; ".join(dict.fromkeys(by_pid[pid]["location"].split("; ") + locs))
+                continue
+            row = {"company": company, "title": j.get("postingTitle", ""),
+                   "location": "; ".join(locs),
+                   "url": f"https://jobs.apple.com/en-us/details/{pid}/{j.get('transformedPostingTitle', '')}",
+                   "department": (j.get("team") or {}).get("teamName", ""),
+                   "posted_at": str(j.get("postDateInGMT") or "")[:10], "source": "apple"}
+            by_pid[pid] = row
+            out.append(row)
+        if len(results) < 20:
+            break
+        _t.sleep(1)
+    return out
+
 def fetch_all(sources):
     postings, errors = [], []
     counts = {}  # per-source fetch count; -1 = errored (for health monitoring)
@@ -488,7 +582,7 @@ def fetch_all(sources):
               "eightfold": fetch_eightfold, "oraclecloud": fetch_oraclecloud}
     standalone = {"a16z": fetch_a16z, "amazon": fetch_amazon, "bcg": fetch_bcg,
                   "rippling": fetch_rippling, "speedrun": fetch_speedrun,
-                  "apmlist": fetch_apmlist}
+                  "apmlist": fetch_apmlist, "microsoft": fetch_microsoft, "apple": fetch_apple}
     for e in sources.get("ats", []):
         try:
             if e["ats"] in simple:

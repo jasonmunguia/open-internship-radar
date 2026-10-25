@@ -2,7 +2,7 @@
 import hashlib, json, os, re, sys, time, urllib.request
 import yaml
 from radar.fetchers import fetch_all, fetch_substack, watch_page, is_posting_live
-from radar.queue_state import relay as qs_relay
+from radar.queue_state import relay as qs_relay, req_id
 from radar.score import score_posting, is_us_location
 from radar.settings import MENTION, RELAY_BASE
 
@@ -158,6 +158,46 @@ def fit_brief_md(p, score, brief, intel=None):
         "", f"_source: {p['source']}_ {MENTION}"]
     return "\n".join(lines)
 
+# ---- alert dedupe (2026-10-25) ----
+# Alerts collapse cross-board copies of ONE role by company+title. That alone also
+# swallowed a genuinely new requisition with the same title: Microsoft's Cambridge
+# "Product Manager Intern" (posted 2026-10-23) never alerted because a different
+# Microsoft "Product Manager Intern" req had alerted on 2026-08-04. A row carrying an
+# ATS req id is now judged by that id; only rows without one fall back to company+title.
+def alert_keys(p):
+    ck = "alert:" + p.get("company", "").lower().strip() + "|" + p.get("title", "").lower().strip()
+    rid = req_id(p.get("url", ""))
+    return ck, ("alert:req:" + rid) if rid else None
+
+def alert_suppressed(p, seen):
+    ck, rk = alert_keys(p)
+    if not rk:
+        return ck in seen
+    if rk in seen:
+        return True
+    # A req POSTED on or before the day its title already alerted is that alert's role
+    # arriving from a new feed, not a new drop (Microsoft "CTJ - TS" reqs, 2026-09-11).
+    prior, posted = seen.get(ck), str(p.get("posted_at") or "")[:10]
+    if isinstance(prior, int) and posted:
+        return posted <= time.strftime("%Y-%m-%d", time.gmtime(prior + 86400))
+    return False
+
+def mark_alerted(p, seen, now):
+    ck, rk = alert_keys(p)
+    seen[ck] = now
+    if rk:
+        seen[rk] = now
+
+def seed_req_alert_keys(seen, rows, window=2 * 86400):
+    """Backfill req keys for roles alerted before req keys existed: a queue row whose
+    company+title alerted within `window` of the row's own ingest IS that alert's role
+    (its direct-ATS copy). A row first seen long after the alert is a different req and
+    is left alone — that is exactly the case the req key exists to let through."""
+    for r in rows:
+        ck, rk = alert_keys(r)
+        if rk and rk not in seen and isinstance(seen.get(ck), int) and abs(r.get("ts", 0) - seen[ck]) <= window:
+            seen[rk] = seen[ck]
+
 def main():
     with open(os.path.join(ROOT, "config", "profile.yaml")) as f:
         profile = yaml.safe_load(f)
@@ -167,6 +207,16 @@ def main():
     intel = yaml.safe_load(open(intel_path)) if os.path.exists(intel_path) else {}
     seen = json.load(open(SEEN)) if os.path.exists(SEEN) else {}
     first_run = not seen
+
+    if os.path.exists(QUEUE):
+        _rows = []
+        with open(QUEUE) as fh:
+            for line in fh:
+                try:
+                    _rows.append(json.loads(line))
+                except json.JSONDecodeError:
+                    pass   # a torn line must never stop the poll
+        seed_req_alert_keys(seen, _rows)
 
     postings, errors, counts = fetch_all(sources)
     for e in errors:
@@ -198,8 +248,7 @@ def main():
             # first run seeds state silently — don't flood 500 issues
             # cross-source dedup: the same role often lists on a company board AND a VC portfolio board;
             # alert on it once (by company+title), not once per board.
-            akey = "alert:" + p.get("company", "").lower().strip() + "|" + p.get("title", "").lower().strip()
-            if not first_run and score >= threshold and gh_token and akey not in seen:
+            if not first_run and score >= threshold and gh_token and not alert_suppressed(p, seen):
                 # Liveness gate (career-ops doctrine): only alert on a posting that's still open.
                 # Cheap because it runs ONLY on the handful that clear the alert threshold.
                 if not is_posting_live(p.get("url", "")):
@@ -210,14 +259,14 @@ def main():
                 try:
                     if not send_alert_email(subj, body):      # clean-subject email preferred
                         create_issue(gh_repo, gh_token, subj, body, ["alert", brief["tier"]])
-                    seen[akey] = int(time.time())
+                    mark_alerted(p, seen, int(time.time()))
                     alert_count += 1
                     time.sleep(1)
                 except Exception as ex:
                     print(f"[warn] alert failed ({p['company']}): {ex}", file=sys.stderr)
                     try:                                       # last resort: GitHub issue
                         create_issue(gh_repo, gh_token, subj, body, ["alert", brief["tier"]])
-                        seen[akey] = int(time.time())
+                        mark_alerted(p, seen, int(time.time()))
                         alert_count += 1
                     except Exception as ex2:
                         print(f"[warn] issue fallback failed: {ex2}", file=sys.stderr)

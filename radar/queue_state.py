@@ -205,6 +205,7 @@ _REQ = (
     ("wd",   re.compile(r"myworkdayjobs\.com/.*_((?:jr|r)?\d{4,})(?=[/?#]|$)")),
     ("sr",   re.compile(r"smartrecruiters\.com/[^/]+/(\d{10,})")),
     ("job",  re.compile(r"/job/(\d{6,})(?=[/?#]|$)")),          # Oracle CX + careers.* mirrors
+    ("apple", re.compile(r"jobs\.apple\.com/[^/]+/details/(\d{6,})")),  # positionId, shared across locations
 )
 
 def req_id(url):
