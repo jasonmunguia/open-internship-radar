@@ -102,6 +102,22 @@ def test_req_id_matches_when_tapped_row_left_the_queue(monkeypatch):
         done = qs.done_state([mirror])
         assert qs.is_done(mirror, done)
 
+def test_distinct_req_same_title_is_not_a_twin(monkeypatch):
+    # 2026-10-25: Microsoft posts one "Product Manager Intern" req per office. A tap on
+    # the Remote req must not hide the Cambridge req; board copies without a req id
+    # (zapply/jobright) still collapse onto the tapped role.
+    tapped = {"company": "Microsoft", "title": "Product Manager Intern", "location": "Remote",
+              "url": "https://apply.careers.microsoft.com/careers/job/1970393556953113"}
+    cambridge = {"company": "Microsoft", "title": "Product Manager Intern", "location": "Cambridge, MA",
+                 "url": "https://apply.careers.microsoft.com/careers/job/1970393557044772"}
+    copy = {"company": "Microsoft", "title": "Product Manager Intern", "location": "Remote",
+            "url": "https://jobright.ai/jobs/info/abc123"}
+    with tempfile.TemporaryDirectory() as td:
+        _ledger(monkeypatch, td, [{"job_id": qs.job_id(tapped), "action": "applied", "ts": 1, "url": tapped["url"]}])
+        done = qs.done_state([tapped, cambridge, copy])
+        assert not qs.is_done(cambridge, done)
+        assert qs.is_done(copy, done)
+
 def test_undo_reopens_the_whole_family(monkeypatch):
     a = {"company": "Gemini", "title": "Product Management Intern", "url": "https://job-boards.greenhouse.io/gemini/jobs/1"}
     b = {"company": "Gemini", "title": "Product Management Intern", "url": "https://jobright.ai/jobs/info/abc"}

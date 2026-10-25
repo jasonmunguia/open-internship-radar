@@ -260,7 +260,7 @@ def done_state(rows, ids=None):
             reqs.add(rid)
         co, core, terms = role_key(r)
         if co and core:
-            keys.setdefault((co, core), []).append(terms)
+            keys.setdefault((co, core), []).append((terms, rid))
     return {"ids": ids, "reqs": reqs, "keys": keys}
 
 
@@ -273,7 +273,13 @@ def is_done(row, done):
     co, core, terms = role_key(row)
     if not (co and core):
         return False
-    for t in done["keys"].get((co, core), ()):
+    kind = rid.split(":")[0] if rid else None
+    for t, trid in done["keys"].get((co, core), ()):
+        # Same company+title but both carry a req id from the same ATS, and they differ:
+        # provably a DIFFERENT requisition, not a twin (e.g. one "Product Manager Intern"
+        # req per office — a tap on one office must not hide the others).
+        if kind and trid and trid.split(":")[0] == kind:
+            continue
         if t <= terms or terms <= t:    # one term set contains the other (or is empty)
             return True
     return False
