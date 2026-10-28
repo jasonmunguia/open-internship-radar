@@ -5,7 +5,7 @@ on:
     # Off the :00 minute on purpose: GitHub delays and drops top-of-hour schedules under load,
     # and in October only 113 of ~270 scheduled 2-hour polls actually ran.
     # Budget: a run under 60s bills 1 minute, so this is ~1,570 min/month on a private repo,
-    # inside GitHub Free's 2,000. Pro (3,000) affords every 20 min: "7,27,47 * * * *".
+    # inside GitHub Free's 2,000 (public repos don't use minutes at all).
     - cron: "7,37 * * * *"
   workflow_dispatch: {}
 permissions:

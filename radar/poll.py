@@ -11,7 +11,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEEN = os.path.join(ROOT, "data", "seen.json")
 QUEUE = os.path.join(ROOT, "data", "queue.jsonl")
 FUNDED = os.path.join(ROOT, "data", "funded_watch.json")
-DARK_STREAK = 18   # consecutive empty/errored polls before a source counts as dark
+DARK_STREAK = 12   # consecutive empty/errored polls before a source counts as dark
 
 def load_funded():
     """{company_substr_lower: {amount,date,industry}} within a rolling 120-day window."""
@@ -40,7 +40,7 @@ def refresh_funded():
     # Fold the same filings into PERSISTENT funding history. Without this the funding tier
     # signal only ever knew the ~14-day rolling window, which is why MaintainX banded T4.
     # It ran every poll until 2026-10-28: 13s of SEC requests per run for data that changes
-    # daily, enough on its own to push a 20-minute poll past 60s and bill 2 minutes.
+    # daily, enough on its own to push a poll past 60s and bill 2 minutes.
     try:
         from radar.funding_history import ingest as _fh_ingest
         _fh_ingest(rows)
@@ -337,8 +337,8 @@ def main():
             h = {"streak": 0, "ever_good": True, "alerted": False}
         elif h.get("ever_good"):   # was healthy, now 0 or errored
             h["streak"] = h.get("streak", 0) + 1
-            # 18 consecutive dark runs (~9h at the default 30-min cadence, ~6h at 20) on a previously-good
-            # source -> alert once. Was 3 at the 2h cadence; 3 now would be one hour.
+            # 12 consecutive dark runs (~6h at the 30-min cadence) on a previously-good
+            # source -> alert once. Was 3 at the 2h cadence; 3 now would be 90 minutes.
             if h["streak"] >= DARK_STREAK and not h.get("alerted") and gh_token:
                 try:
                     create_issue(gh_repo, gh_token,

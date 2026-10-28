@@ -57,10 +57,10 @@ def test_alarm_stays_silent_at_the_planned_pace(monkeypatch):
     created = []
     monkeypatch.setattr(heartbeat, "create_issue", lambda *a: created.append(a))
     now = datetime(2026, 11, 10, 15, tzinfo=timezone.utc)
-    pace = [run("2026-11-01T00:07:00", 45)] * (72 * 9 + 24)      # 20-min polls, 1 min each
+    pace = [run("2026-11-01T00:07:00", 45)] * (48 * 9 + 16)      # 30-min polls, 1 min each
     monkeypatch.setattr(heartbeat, "_api", _fake_api(pace, []))
     used, projected = heartbeat.minutes_check("o/r", "t", 3000, now)
-    assert used == 72 * 9 + 24 and 2000 < projected < 2700 and created == []
+    assert used == 48 * 9 + 16 and 1000 < projected < 2700 and created == []
 
 
 def test_speedrun_pages_keep_order_and_stop_at_the_first_gap(monkeypatch):

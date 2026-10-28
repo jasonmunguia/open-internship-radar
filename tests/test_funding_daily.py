@@ -1,6 +1,6 @@
 """SEC Form D data changes daily, so the poll fetches it once a day: one request feeds both the
 persistent funding history ($25M+) and the 14-day watchlist ($60M+). It used to run every poll,
-13s of SEC requests per run, enough to push a 20-minute poll past 60s and bill 2 minutes."""
+13s of SEC requests per run, enough to push a poll past 60s and bill 2 minutes."""
 import json, os, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
