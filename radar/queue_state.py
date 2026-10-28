@@ -206,6 +206,11 @@ _REQ = (
     ("sr",   re.compile(r"smartrecruiters\.com/[^/]+/(\d{10,})")),
     ("job",  re.compile(r"/job/(\d{6,})(?=[/?#]|$)")),          # Oracle CX + careers.* mirrors
     ("apple", re.compile(r"jobs\.apple\.com/[^/]+/details/(\d{6,})")),  # positionId, shared across locations
+    # zapply redirect slugs embed the ATS req: workday-micron-external-JR115941 is the same
+    # req as Micron's own ..._JR115941. Without these, adding a direct feed re-alerts every
+    # role zapply already alerted (Micron, 2026-10-27).
+    ("wd",   re.compile(r"zapply\.jobs/l/d/workday-[^?#]+-((?:jr|r)?\d{4,})(?=[/?#]|$)")),
+    ("gh",   re.compile(r"zapply\.jobs/l/d/greenhouse-[^/?#]+-(\d{6,})(?=[/?#]|$)")),
 )
 
 def req_id(url):

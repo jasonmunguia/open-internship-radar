@@ -50,3 +50,20 @@ def test_req_posted_before_title_alert_is_not_new():
     new = {**CAMBRIDGE, "posted_at": "2026-10-23"}
     assert poll.alert_suppressed(old, seen)
     assert not poll.alert_suppressed(new, seen)
+
+def test_zapply_copy_shares_the_direct_req_id():
+    # 2026-10-27: Micron went direct; the zapply copies had already alerted.
+    z = qs.req_id("https://zapply.jobs/l/d/workday-micron-external-JR115941?s=gh-internships-2027")
+    d = qs.req_id("https://micron.wd1.myworkdayjobs.com/en-US/External/job/San-Jose-CA/"
+                  "Intern---CMBU-Product-Management_JR115941")
+    assert z == d == "wd:jr115941"
+    assert qs.req_id("https://zapply.jobs/l/d/greenhouse-coinbase-8175504?s=x") == "gh:8175504"
+
+def test_alert_keys_outlive_posting_keys():
+    now = OCT + 30 * 86400
+    seen = {"abc123": AUG, "alert:req:wd:jr1": AUG, "alert:x|y": AUG,
+            "page:https://a": "h", "cfwatch:https://b": "h", "fresh": now}
+    kept = poll.prune_seen(seen, now)
+    assert "abc123" not in kept                       # posting key: 110 days old, expired
+    assert {"alert:req:wd:jr1", "alert:x|y", "page:https://a", "cfwatch:https://b", "fresh"} <= set(kept)
+    assert "alert:x|y" not in poll.prune_seen(seen, AUG + 366 * 86400)

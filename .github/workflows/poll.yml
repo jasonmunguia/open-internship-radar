@@ -1,9 +1,12 @@
 name: poll
 on:
   schedule:
-    # every 2 hours, skipping the 2-7am PDT quiet window. UTC hours (PDT = UTC-7).
-    # Burning alerts fire within one poll cycle (<=2h) — plenty fast for rolling reviews measured in days.
-    - cron: "0 0,2,4,6,8,14,16,18,20,22 * * *"
+    # Every 30 minutes, around the clock (2026-10-27: alerts the moment a role drops).
+    # Off the :00 minute on purpose: GitHub delays and drops top-of-hour schedules under load,
+    # and in October only 113 of ~270 scheduled 2-hour polls actually ran.
+    # Budget: a run under 60s bills 1 minute, so this is ~1,570 min/month on a private repo,
+    # inside GitHub Free's 2,000. Pro (3,000) affords every 20 min: "7,27,47 * * * *".
+    - cron: "7,37 * * * *"
   workflow_dispatch: {}
 permissions:
   contents: write
@@ -45,6 +48,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # seen.json is a key set two machines write; the driver merges it as a union so a
+          # concurrent Mac push can't fail this push and drop the alert keys just recorded.
+          git config merge.seen.driver "python3 -m radar.merge_seen %O %A %B"
           git add data/
           git diff --cached --quiet || git commit -m "state: $(date -u +%FT%TZ) [skip ci]"
-          git pull --rebase && git push
+          for i in 1 2 3 4 5; do
+            git pull --rebase && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $((i * 5))
+          done
+          echo "::error::state push failed 5x; alert keys from this run are not saved"
+          exit 1

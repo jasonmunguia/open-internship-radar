@@ -1,5 +1,6 @@
 """Main poller: fetch -> diff -> score -> alert (GitHub issue) -> persist state."""
 import hashlib, json, os, re, sys, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 import yaml
 from radar.fetchers import fetch_all, fetch_substack, watch_page, is_posting_live
 from radar.queue_state import relay as qs_relay, req_id
@@ -10,6 +11,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SEEN = os.path.join(ROOT, "data", "seen.json")
 QUEUE = os.path.join(ROOT, "data", "queue.jsonl")
 FUNDED = os.path.join(ROOT, "data", "funded_watch.json")
+DARK_STREAK = 18   # consecutive empty/errored polls before a source counts as dark
 
 def load_funded():
     """{company_substr_lower: {amount,date,industry}} within a rolling 120-day window."""
@@ -31,7 +33,23 @@ def refresh_funded():
         return data
     try:
         from radar.funding import recent_big_form_ds
-        for r in recent_big_form_ds(days=2, min_amount=60_000_000):
+        rows = recent_big_form_ds(days=2, min_amount=25_000_000)
+    except Exception as ex:
+        rows = []
+        print(f"[warn] funding refresh: {ex}", file=sys.stderr)
+    # Fold the same filings into PERSISTENT funding history. Without this the funding tier
+    # signal only ever knew the ~14-day rolling window, which is why MaintainX banded T4.
+    # It ran every poll until 2026-10-28: 13s of SEC requests per run for data that changes
+    # daily, enough on its own to push a 20-minute poll past 60s and bill 2 minutes.
+    try:
+        from radar.funding_history import ingest as _fh_ingest
+        _fh_ingest(rows)
+    except Exception as ex:
+        print(f"[warn] funding history ingest skipped: {ex}", file=sys.stderr)
+    try:
+        for r in rows:
+            if r["amount"] < 60_000_000:
+                continue
             key = re.sub(r"[^a-z0-9 ]", "", r["company"].lower()).strip()
             key = re.sub(r"\b(inc|llc|corp|corporation|ltd|co|technologies|labs|holdings)\b", "", key).strip()
             if len(key) >= 4:
@@ -198,6 +216,14 @@ def seed_req_alert_keys(seen, rows, window=2 * 86400):
         if rk and rk not in seen and isinstance(seen.get(ck), int) and abs(r.get("ts", 0) - seen[ck]) <= window:
             seen[rk] = seen[ck]
 
+def prune_seen(seen, now, retain=90 * 86400, alert_retain=365 * 86400):
+    """Posting keys expire at 90 days, alert keys at a year, page-watch hashes never.
+    cfwatch: is the Mac scrape's deadline-page hash; it was being pruned every poll (a
+    string, not a timestamp), so that watcher never had a previous hash to compare."""
+    return {k: v for k, v in seen.items()
+            if k.startswith(("page:", "cfwatch:"))
+            or (isinstance(v, int) and v >= now - (alert_retain if k.startswith("alert:") else retain))}
+
 def main():
     with open(os.path.join(ROOT, "config", "profile.yaml")) as f:
         profile = yaml.safe_load(f)
@@ -205,6 +231,7 @@ def main():
         sources = yaml.safe_load(f)
     intel_path = os.path.join(ROOT, "config", "company_intel.yaml")
     intel = yaml.safe_load(open(intel_path)) if os.path.exists(intel_path) else {}
+    t0 = time.time()
     seen = json.load(open(SEEN)) if os.path.exists(SEEN) else {}
     first_run = not seen
 
@@ -219,6 +246,7 @@ def main():
         seed_req_alert_keys(seen, _rows)
 
     postings, errors, counts = fetch_all(sources)
+    fetch_secs = time.time() - t0
     for e in errors:
         print(f"[warn] {e}", file=sys.stderr)
     postings += discovered_postings()
@@ -271,15 +299,6 @@ def main():
                     except Exception as ex2:
                         print(f"[warn] issue fallback failed: {ex2}", file=sys.stderr)
 
-    # Fold today's Form D filings into PERSISTENT funding history. Without this the funding
-    # tier signal only ever knew the ~14-day rolling window, which is why MaintainX banded T4.
-    try:
-        from radar.funding import recent_big_form_ds
-        from radar.funding_history import ingest as _fh_ingest
-        _fh_ingest(recent_big_form_ds(days=2, min_amount=25_000_000))
-    except Exception as ex:
-        print(f"[warn] funding history ingest skipped: {ex}", file=sys.stderr)
-
     # newsletters: new issues -> digest queue (no instant alert)
     with open(QUEUE, "a") as q:
         for nl in sources.get("newsletters", []):
@@ -296,9 +315,20 @@ def main():
                 print(f"[warn] newsletter {nl['name']}: {ex}", file=sys.stderr)
 
     # fellowship page watchers: content change -> instant issue
-    for w in sources.get("watch_pages", []):
+    # Fetched concurrently (12s serial was a fifth of the 30-min poll's run time);
+    # each page's result, or its exception, is handled in config order as before.
+    def _watch(w):
         try:
-            h = watch_page(w["name"], w["url"])
+            return watch_page(w["name"], w["url"]), None
+        except Exception as ex:
+            return None, ex
+    _pages = sources.get("watch_pages", [])
+    with ThreadPoolExecutor(8) as ex:
+        _hashes = list(ex.map(_watch, _pages))
+    for w, (h, err) in zip(_pages, _hashes):
+        try:
+            if err is not None:
+                raise err
             key = f"page:{w['url']}"
             old = seen.get(key)
             seen[key] = h
@@ -319,8 +349,9 @@ def main():
             h = {"streak": 0, "ever_good": True, "alerted": False}
         elif h.get("ever_good"):   # was healthy, now 0 or errored
             h["streak"] = h.get("streak", 0) + 1
-            # 3 consecutive dark runs (~6h) on a previously-good source -> alert once
-            if h["streak"] >= 3 and not h.get("alerted") and gh_token:
+            # 18 consecutive dark runs (~9h at the default 30-min cadence, ~6h at 20) on a previously-good
+            # source -> alert once. Was 3 at the 2h cadence; 3 now would be one hour.
+            if h["streak"] >= DARK_STREAK and not h.get("alerted") and gh_token:
                 try:
                     create_issue(gh_repo, gh_token,
                                  f"⚠️ [health] source '{name}' went dark ({'errors' if n < 0 else '0 results'} x{h['streak']})",
@@ -374,11 +405,14 @@ def main():
                   f"{dropped_relic} gate-relic rows (logged to dropped_relics.jsonl)")
 
     # ---- pruning: keep seen/queue bounded to a 90-day window so the repo never bloats over years ----
+    # Alert keys outlive posting keys: GitHub lists keep a role for months, so when its
+    # 90-day posting key expired the role read as new and its alert key — pruned on the
+    # same clock — no longer suppressed it. The first alerts (2026-07-30) hit that edge
+    # on 2026-10-28. An alert fires once per role; a year covers any recruiting cycle.
     RETAIN = 90 * 86400
     cutoff = int(time.time()) - RETAIN
     before = len(seen)
-    seen = {k: v for k, v in seen.items()
-            if k.startswith("page:") or (isinstance(v, int) and v >= cutoff)}
+    seen = prune_seen(seen, int(time.time()))
     if os.path.exists(QUEUE):
         kept = []
         for line in open(QUEUE):
@@ -392,14 +426,15 @@ def main():
     json.dump(seen, open(SEEN, "w"))
 
     # ---- heartbeat: proof-of-life for the dead-man's switch (a separate watcher reads this) ----
-    dark = sorted(k for k, v in health.items() if v.get("streak", 0) >= 3)
+    dark = sorted(k for k, v in health.items() if v.get("streak", 0) >= DARK_STREAK)
     json.dump({"last_poll": int(time.time()), "postings": len(postings),
                "new_scored": new_count, "alerts": alert_count,
                "dark_sources": dark, "seen_pruned_from": before, "seen_now": len(seen)},
               open(os.path.join(ROOT, "data", "heartbeat.json"), "w"))
 
     print(f"postings={len(postings)} new_scored={new_count} alerts={alert_count} "
-          f"dark={len(dark)} seen={before}->{len(seen)} first_run={first_run}")
+          f"dark={len(dark)} seen={before}->{len(seen)} first_run={first_run} "
+          f"secs={time.time() - t0:.0f} (fetch {fetch_secs:.0f})")   # job must stay <60s: 1 billed minute
 
 if __name__ == "__main__":
     main()

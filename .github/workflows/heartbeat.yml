@@ -6,6 +6,7 @@ on:
 permissions:
   contents: read
   issues: write
+  actions: read      # minutes budget check reads the run list
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
@@ -19,6 +20,7 @@ jobs:
       - name: Check pulse
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTIONS_MINUTES_QUOTA: "2000"   # GitHub Free; set 3000 on Pro
         run: |
           if [ ! -f config/profile.yaml ]; then
             echo "Unconfigured template - no pulse to check. Skipping."

@@ -1,4 +1,4 @@
-# Sources polled every 2 hours by GitHub Actions (skips 02:00-07:00 PT).
+# Sources polled every 30 minutes by GitHub Actions (:07 and :37, around the clock).
 # ats entries verified 2026-07-26 (see agent research); github_repos are markdown job-list repos.
 
 # Verified live 2026-07-26. Not includable (no public JSON API / bot-walled):
@@ -115,6 +115,8 @@ ats:
   - {name: Salesforce, ats: workday, token: "salesforce@wd12/External_Career_Site"}
   - {name: Adobe, ats: workday, token: "adobe@wd5/external_experienced"}
   - {name: Intel, ats: workday, token: "intel@wd1/External"}
+  # Micron: its intern feed ignores searchText, so fetch_workday uses the intern facet.
+  - {name: Micron Technology, ats: workday, token: "micron@wd1/External"}
   - {name: Disney, ats: workday, token: "disney@wd5/disneycareer"}
   - {name: Target, ats: workday, token: "target@wd5/targetcareers"}
   - {name: Home Depot, ats: workday, token: "homedepot@wd5/CareerDepot"}

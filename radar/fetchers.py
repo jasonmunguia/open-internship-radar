@@ -1,5 +1,6 @@
 """Source fetchers: ATS boards (Greenhouse/Lever/Ashby) + GitHub job-list repos."""
 import re, json, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 from radar.settings import USER_AGENT
 
@@ -104,13 +105,26 @@ def fetch_workday(company, token):
     # Nvidia (exactly 100 "intern" hits, relevance-sorted), so anything past it never arrived.
     total = 100
     offset = 0
+    body = {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": "intern"}
+    by_facet = False
     while offset < min(total, 600):
-        data = json.loads(_post_hdr(url, {"appliedFacets": {}, "limit": 20, "offset": offset, "searchText": "intern"},
+        body["offset"] = offset
+        data = json.loads(_post_hdr(url, body,
                                     {"User-Agent": UA["User-Agent"], "Content-Type": "application/json",
                                      "Accept": "application/json"}))
         jp = data.get("jobPostings", [])
         if not jp:
             break
+        has_intern = any(re.search(r"\bintern", j.get("title", ""), re.I) for j in jp)
+        # Some tenants ignore searchText and sort by date (Micron, 2026-10-27: page one was
+        # all engineers, so the early break below returned zero interns while 9 had posted
+        # that day). Their intern facet is exact, so restart filtered by it, unbroken.
+        if offset == 0 and not has_intern and not by_facet:
+            facet = _workday_intern_facet(data)
+            if facet:
+                body = {"appliedFacets": facet, "limit": 20, "offset": 0, "searchText": ""}
+                by_facet = True
+                continue
         for j in jp:
             out.append({"company": company, "title": j.get("title", ""),
                         "location": j.get("locationsText", ""),
@@ -120,10 +134,21 @@ def fetch_workday(company, token):
             total = int(data.get("total") or 100)
         # Results are relevance-sorted and "intern" also matches "International": once a
         # whole page carries no intern title, the real hits are exhausted.
-        if len(jp) < 20 or not any(re.search(r"\bintern", j.get("title", ""), re.I) for j in jp):
+        if len(jp) < 20 or (not by_facet and not has_intern):
             break
         offset += 20
     return out
+
+def _workday_intern_facet(data):
+    """{facetParameter: [ids]} for the tenant's intern job-type/category facet, else None."""
+    for f in data.get("facets", []):
+        if f.get("facetParameter") not in ("workerSubType", "jobFamilyGroup"):
+            continue
+        ids = [v["id"] for v in f.get("values", [])
+               if v.get("id") and re.search(r"\bintern", v.get("descriptor", ""), re.I)]
+        if ids:
+            return {f["facetParameter"]: ids}
+    return None
 
 def fetch_smartrecruiters(company, org):
     out = []
@@ -275,20 +300,27 @@ def fetch_speedrun(company="a16z speedrun network", pages=12):
     """a16z speedrun talent network — public v1 API (no auth/keys).
     Covers the a16z portfolio (10k+ roles) AND a wider 'market' set, ~4.7k tagged seniority=intern.
     Documented at /developers; spec at /api/v1/openapi.json. Sorted recent-first, so a dozen pages
-    comfortably covers everything new since the last 2-hour run. Carries real publish dates and
-    comp bands, which most ATS feeds don't."""
-    import time as _t
-    out = []
-    for page in range(1, pages + 1):
-        url = ("https://speedrun-talent-network.com/api/v1/jobs"
-               f"?sen=intern&sort=recent&page={page}")
+    comfortably covers everything new since the last 30-minute run. Carries real publish dates and
+    comp bands, which most ATS feeds don't.
+    Pages 2+ are fetched concurrently (2026-10-28): the API's per-page latency swings from 0.1s
+    to ~6s, so twelve serial pages took 4s on a good minute and 70s on a bad one. That was the
+    whole poll's critical path, and the difference between a run billing 1 Actions minute or 2."""
+    def get_page(page):
         try:
-            data = json.loads(_get(url))
+            return json.loads(_get("https://speedrun-talent-network.com/api/v1/jobs"
+                                   f"?sen=intern&sort=recent&page={page}"))
         except Exception:
-            break
-        jobs = data.get("jobs", [])
+            return None
+
+    first = get_page(1)
+    last = min(pages, (first or {}).get("total_pages") or 1)
+    with ThreadPoolExecutor(6) as ex:
+        rest = list(ex.map(get_page, range(2, last + 1)))
+    out = []
+    for data in [first] + rest:
+        jobs = (data or {}).get("jobs", [])
         if not jobs:
-            break
+            break      # a failed or empty page ends the walk, as the serial loop did
         for j in jobs:
             comp = ""
             if j.get("comp_min"):
@@ -303,9 +335,6 @@ def fetch_speedrun(company="a16z speedrun network", pages=12):
                         "pay": (comp + "/yr") if comp else "",
                         "posted_at": str(_pick(j, "published_at"))[:10],
                         "source": "speedrun"})
-        if page >= data.get("total_pages", 0):
-            break
-        _t.sleep(0.2)
     return out
 
 def fetch_amazon(company="Amazon"):
@@ -411,7 +440,7 @@ def fetch_apmlist(company="APM List"):
     (counts -1 in health monitoring), never as a quiet 0 — zero OPEN rows is legitimate."""
     text = _get("https://apmlist.org", timeout=30).replace('\\"', '"')
     chunks = _APMLIST_REC.split(text)[1:]
-    out, total = [], 0
+    out, total, clicks = [], 0, []
     for c in chunks:
         c = c.split('"readGuide"')[0]
         title = re.match(r'\{"id":"[a-f0-9-]{36}","title":"((?:[^"\\]|\\.)*)"', c)
@@ -426,12 +455,17 @@ def fetch_apmlist(company="APM List"):
         loc = re.search(r'"locations":\[\{"value":"((?:[^"\\]|\\.)*)"', c)
         sal = re.search(r'"min_annual_salary":(\d+),"max_annual_salary":(\d+)', c)
         pay = f"${int(sal.group(1)):,}–${int(sal.group(2)):,}/yr" if sal else ""
+        clicks.append(url.group(1))
         out.append({"company": comp.group(1), "title": title.group(1),
                     "location": loc.group(1) if loc else "",
-                    "url": _resolve_click(url.group(1)), "department": "Product",
+                    "url": "", "department": "Product",
                     "posted_at": "", "pay": pay, "source": "apmlist"})
     if total == 0:
         raise ValueError("apmlist: 0 records parsed from RSC payload — page format changed")
+    # One redirect per open program, ~1s each: serially this was 61s of every poll.
+    with ThreadPoolExecutor(8) as ex:
+        for row, resolved in zip(out, ex.map(_resolve_click, clicks)):
+            row["url"] = resolved
     return out
 
 MD_ROW = re.compile(r"^\|(.+)\|\s*$")
@@ -573,9 +607,11 @@ def fetch_apple(company="Apple"):
         _t.sleep(1)
     return out
 
-def fetch_all(sources):
-    postings, errors = [], []
-    counts = {}  # per-source fetch count; -1 = errored (for health monitoring)
+def fetch_all(sources, workers=12):
+    """Every ATS board and GitHub list, fetched concurrently (2026-10-27: the poll moved
+    from every 2h to every 30min, and the serial loop took ~4 of the run's 6 minutes —
+    six minutes a run would exhaust the free Actions quota). Results are merged back in
+    config order, so which board's copy of a role arrives first is unchanged."""
     simple = {"greenhouse": fetch_greenhouse, "lever": fetch_lever, "ashby": fetch_ashby,
               "getro": fetch_getro, "manatal": fetch_manatal, "consider": fetch_consider,
               "workday": fetch_workday, "smartrecruiters": fetch_smartrecruiters,
@@ -583,27 +619,31 @@ def fetch_all(sources):
     standalone = {"a16z": fetch_a16z, "amazon": fetch_amazon, "bcg": fetch_bcg,
                   "rippling": fetch_rippling, "speedrun": fetch_speedrun,
                   "apmlist": fetch_apmlist, "microsoft": fetch_microsoft, "apple": fetch_apple}
+    jobs = []   # (count key, error label, thunk)
     for e in sources.get("ats", []):
-        try:
-            if e["ats"] in simple:
-                got = simple[e["ats"]](e["name"], e["token"])
-            elif e["ats"] in standalone:
-                got = standalone[e["ats"]]()
-            else:
-                continue
-            postings.extend(got)
-            counts[e["name"]] = len(got)
-        except Exception as ex:
-            errors.append(f"{e['name']}: {ex}")
-            counts[e["name"]] = -1
+        if e["ats"] in simple:
+            jobs.append((e["name"], e["name"], lambda e=e: simple[e["ats"]](e["name"], e["token"])))
+        elif e["ats"] in standalone:
+            jobs.append((e["name"], e["name"], standalone[e["ats"]]))
     for repo in sources.get("github_repos", []):
+        jobs.append((f"repo:{repo}", repo, lambda repo=repo: fetch_github_repo(repo)))
+
+    def run(job):
         try:
-            got = fetch_github_repo(repo)
-            postings.extend(got)
-            counts[f"repo:{repo}"] = len(got)
+            return job[2](), None
         except Exception as ex:
-            errors.append(f"{repo}: {ex}")
-            counts[f"repo:{repo}"] = -1
+            return None, ex
+
+    postings, errors = [], []
+    counts = {}  # per-source fetch count; -1 = errored (for health monitoring)
+    with ThreadPoolExecutor(workers) as ex:
+        for (key, label, _), (got, err) in zip(jobs, ex.map(run, jobs)):
+            if err is not None:
+                errors.append(f"{label}: {err}")
+                counts[key] = -1
+            else:
+                postings.extend(got)
+                counts[key] = len(got)
     return postings, errors, counts
 
 

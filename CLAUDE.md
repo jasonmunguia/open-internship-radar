@@ -107,7 +107,7 @@ An agent that cannot recognise a broken run will report success. When in doubt, 
 today's log to these shapes before believing either the log or yourself.
 
 ## Where the system runs — the three-surface runtime map
-- **GitHub Actions (cloud, laptop-independent):** the 2-hour poll of every source
+- **GitHub Actions (cloud, laptop-independent):** the 30-minute poll of every source (:07 and :37; runs in ~1 min, sources fetched concurrently)
   (ATS boards, aggregator repos, watch pages, newsletters) + instant alert emails;
   `apply-log`, the tap RECORDER (see below); the daily dead-man's-switch heartbeat.
 - **The operator's machine (launchd, needs it awake — lid-closed on battery it runs

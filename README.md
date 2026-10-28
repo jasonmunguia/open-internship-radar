@@ -129,7 +129,7 @@ the match, the timing, and the heads-up to go build the network — and stays ou
 ## Architecture in one picture
 
 ```
-GitHub Actions (every 2h, no laptop)        Your machine (daily + nightly)
+GitHub Actions (every 30 min, no laptop)    Your machine (daily + nightly)
 ├─ 127 direct ATS APIs                      ├─ 06:00 digest, retried hourly to 18:20
 ├─ 25 community job-list repos              │   └─ never sends degraded: any failed LLM
 ├─ VC portfolio boards                      │      pass defers (no send-anyway backstop)

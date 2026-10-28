@@ -83,6 +83,9 @@ def main():
     json.dump(seen, open(seenp, "w"))
     sh("git add data/")
     sh('git -c user.name=radar -c user.email=radar@localhost commit -m "local scrapling corporates [skip ci]"')
+    # seen.json merges as a key union (radar/merge_seen.py); without the driver configured,
+    # this pull falls back to -X ours and drops every key this run just recorded.
+    sh('git config merge.seen.driver "python3 -m radar.merge_seen %O %A %B"')
     sh("git pull --rebase -X ours")
     sh("git push")
 
