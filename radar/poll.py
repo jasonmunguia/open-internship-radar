@@ -2,7 +2,7 @@
 import hashlib, json, os, re, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 import yaml
-from radar.fetchers import fetch_all, fetch_substack, watch_page, is_posting_live
+from radar.fetchers import fetch_all, watch_page, is_posting_live
 from radar.queue_state import relay as qs_relay, req_id
 from radar.score import score_posting, is_us_location
 from radar.settings import MENTION, RELAY_BASE
@@ -299,20 +299,8 @@ def main():
                     except Exception as ex2:
                         print(f"[warn] issue fallback failed: {ex2}", file=sys.stderr)
 
-    # newsletters: new issues -> digest queue (no instant alert)
-    with open(QUEUE, "a") as q:
-        for nl in sources.get("newsletters", []):
-            try:
-                for item in fetch_substack(nl["name"], nl["sub"]):
-                    k = pid(item)
-                    if k in seen:
-                        continue
-                    seen[k] = int(time.time())
-                    if not first_run:
-                        q.write(json.dumps({**item, "score": 0, "cluster": "newsletter",
-                                            "angle": "", "ts": int(time.time())}) + "\n")
-            except Exception as ex:
-                print(f"[warn] newsletter {nl['name']}: {ex}", file=sys.stderr)
+    # Newsletters moved to radar/local_scrape.py (2026-10-28): Substack answers GitHub's
+    # runners with 403 on every run, so they never loaded here. They feed the digest only.
 
     # fellowship page watchers: content change -> instant issue
     # Fetched concurrently (12s serial was a fifth of the 30-min poll's run time);

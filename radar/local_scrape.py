@@ -10,6 +10,37 @@ sys.path.insert(0, REPO)
 def sh(cmd):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=REPO)
 
+def queue_newsletters(newsletters, seen, q, now=None, max_age_days=14):
+    """Job newsletters (Substack RSS) -> digest queue, no instant alert. Moved here from the
+    cloud poll 2026-10-28: Substack answers GitHub's runners with 403 on every run, so the
+    digest's newsletter section had gone empty. From the Mac the feeds load. Issues older
+    than max_age_days are marked seen but not queued, so the backlog from the blocked
+    months doesn't flood one digest."""
+    import hashlib
+    from email.utils import parsedate_to_datetime
+    from radar.fetchers import fetch_substack
+    now = now or time.time()
+    n = 0
+    for nl in newsletters:
+        try:
+            for item in fetch_substack(nl["name"], nl["sub"]):
+                k = hashlib.sha1(f"{item['company']}|{item['title']}|{item['url']}".lower().encode()).hexdigest()[:16]
+                if k in seen:
+                    continue
+                seen[k] = int(now)
+                try:
+                    age_days = (now - parsedate_to_datetime(item["posted_at"]).timestamp()) / 86400
+                except (TypeError, ValueError):
+                    age_days = 0          # undated: queue it rather than lose it
+                if age_days > max_age_days:
+                    continue
+                q.write(json.dumps({**item, "score": 0, "cluster": "newsletter",
+                                    "angle": "", "ts": int(now)}) + "\n")
+                n += 1
+        except Exception as ex:
+            print(f"[warn] newsletter {nl['name']}: {ex}")
+    return n
+
 def main():
     sh("git pull --ff-only")
     from radar.scrapling_fetch import fetch_all_scrapling
@@ -42,6 +73,12 @@ def main():
             n += 1
     json.dump(seen, open(seenp, "w"))
     print(f"scrapling scraped {len(postings)} listings, {n} new scored")
+
+    sources = yaml.safe_load(open(os.path.join(REPO, "config", "sources.yaml")))
+    with open(qp, "a") as q:
+        nn = queue_newsletters(sources.get("newsletters", []), seen, q)
+    json.dump(seen, open(seenp, "w"))
+    print(f"newsletters: {nn} new issues queued")
 
     # ---- Cloudflare-walled deadline trackers: alert on change (Scrapling gets 200 where plain GET 403s).
     # These are calendars, not job lists, so they're watched for edits rather than parsed into postings.
