@@ -91,8 +91,11 @@ def fetch_lever(company, org):
                     "posted_at": posted, "pay": pay, "source": f"lever:{org}"})
     return out
 
-def fetch_workday(company, token):
-    """token = 'tenant/site'. Workday cxs JSON API."""
+def fetch_workday(company, token, search="intern", facets=None):
+    """token = 'tenant/site'. Workday cxs JSON API. A source may set its own `search`
+    words and `facets` filter (sources.yaml): Accenture calls its interns "Summer
+    Analyst" and posts worldwide, so "intern" finds 2,000 mostly non-US rows while
+    US + "summer" is 11 rows in one request (2026-10-28)."""
     tenant, _, site = token.partition("/")
     # infer wd host number from a known map or default wd1; caller can pass 'tenant@wd5/site'
     host = "wd1"
@@ -105,8 +108,8 @@ def fetch_workday(company, token):
     # Nvidia (exactly 100 "intern" hits, relevance-sorted), so anything past it never arrived.
     total = 100
     offset = 0
-    body = {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": "intern"}
-    by_facet = False
+    body = {"appliedFacets": dict(facets or {}), "limit": 20, "offset": 0, "searchText": search}
+    by_facet = bool(facets)     # a configured filter is exact: page through it, no intern heuristics
     while offset < min(total, 600):
         body["offset"] = offset
         data = json.loads(_post_hdr(url, body,
@@ -622,7 +625,9 @@ def fetch_all(sources, workers=12):
     jobs = []   # (count key, error label, thunk)
     for e in sources.get("ats", []):
         if e["ats"] in simple:
-            jobs.append((e["name"], e["name"], lambda e=e: simple[e["ats"]](e["name"], e["token"])))
+            extra = {k: e[k] for k in ("search", "facets") if k in e}     # workday only
+            jobs.append((e["name"], e["name"],
+                         lambda e=e, extra=extra: simple[e["ats"]](e["name"], e["token"], **extra)))
         elif e["ats"] in standalone:
             jobs.append((e["name"], e["name"], standalone[e["ats"]]))
     for repo in sources.get("github_repos", []):

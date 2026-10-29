@@ -33,6 +33,7 @@ MUST_PASS = [
     "intern",                      # bare lowercase, start/end of string
     "Co-op, Supply Chain",
     "Undergraduate Fellow",
+    "Entry Level Advisory Summer Analyst - Various Locations - NAELFY27",   # Accenture, 2026-10-28
 ]
 
 # titles/text the gate MUST reject (the "international" false-positive class)

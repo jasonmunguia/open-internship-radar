@@ -80,13 +80,82 @@ def _row(company="AcmeCorp", url="https://example.com/job/1"):
     return {"company": company, "title": "PM Intern", "url": url}
 
 
-def test_sweep_cached_dead_drops_without_network(tmp_path, monkeypatch):
+def test_sweep_confirmed_dead_drops_without_network(tmp_path, monkeypatch):
     monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
     r = _row()
     import json
-    json.dump({job_id(r): {"status": "dead", "ts": int(time.time())}}, open(liveness.CACHE, "w"))
+    now = int(time.time())
+    json.dump({job_id(r): {"status": "dead", "ts": now, "confirmed": now}}, open(liveness.CACHE, "w"))
     live, dead, unsure, q = sweep([r], allow_network=False)
     assert live == [] and dead == [r] and unsure == []
+
+
+def _probe_says(monkeypatch, verdict):
+    monkeypatch.setattr(liveness, "probe", lambda url, timeout=12: verdict)
+
+
+def test_first_closed_reading_is_held_not_dropped(tmp_path, monkeypatch):
+    """Salesforce's Product GTM intern read closed once mid-repost (2026-10-28) and was
+    hidden for good. One reading now only makes it a suspect: held, rechecked tomorrow."""
+    import json
+    monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
+    _probe_says(monkeypatch, "dead")
+    r = _row()
+    live, dead, unsure, q = sweep([r])
+    assert dead == [] and unsure == [r] and q["suspect"] == 1
+    v = json.load(open(liveness.CACHE))[job_id(r)]
+    assert v["status"] == "suspect" and v["first_dead"] == v["ts"]
+
+
+def test_second_closed_reading_a_day_later_confirms(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
+    r = _row()
+    day_ago = int(time.time()) - (liveness.CONFIRM_GAP_H + 1) * 3600
+    json.dump({job_id(r): {"status": "suspect", "ts": day_ago, "first_dead": day_ago}},
+              open(liveness.CACHE, "w"))
+    _probe_says(monkeypatch, "dead")
+    live, dead, unsure, q = sweep([r])
+    assert dead == [r] and unsure == []
+    assert json.load(open(liveness.CACHE))[job_id(r)]["confirmed"]
+
+
+def test_second_closed_reading_same_day_stays_suspect(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
+    r = _row()
+    hour_ago = int(time.time()) - 3600
+    json.dump({job_id(r): {"status": "suspect", "ts": hour_ago, "first_dead": hour_ago}},
+              open(liveness.CACHE, "w"))
+    _probe_says(monkeypatch, "dead")
+    live, dead, unsure, q = sweep([r])
+    assert dead == [] and unsure == [r]
+    assert json.load(open(liveness.CACHE))[job_id(r)]["first_dead"] == hour_ago   # clock not reset
+
+
+def test_suspect_that_reads_open_again_ships(tmp_path, monkeypatch):
+    import json
+    monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
+    r = _row()
+    day_ago = int(time.time()) - 30 * 3600
+    json.dump({job_id(r): {"status": "suspect", "ts": day_ago, "first_dead": day_ago}},
+              open(liveness.CACHE, "w"))
+    _probe_says(monkeypatch, "live")
+    live, dead, unsure, q = sweep([r])
+    assert live == [r] and json.load(open(liveness.CACHE))[job_id(r)]["status"] == "live"
+
+
+def test_legacy_single_reading_dead_gets_one_more_look(tmp_path, monkeypatch):
+    """Dead entries written before confirmation existed are first strikes, not final."""
+    import json
+    monkeypatch.setattr(liveness, "CACHE", str(tmp_path / "liveness.json"))
+    r = _row()
+    json.dump({job_id(r): {"status": "dead", "ts": int(time.time()) - 5 * 86400}}, open(liveness.CACHE, "w"))
+    live, dead, unsure, q = sweep([r], allow_network=False)
+    assert dead == [] and unsure == [r]
+    _probe_says(monkeypatch, "dead")
+    live, dead, unsure, q = sweep([r])
+    assert dead == [r]                     # its own ts was the first strike, days ago
 
 
 def test_sweep_fresh_live_verdict_ships(tmp_path, monkeypatch):

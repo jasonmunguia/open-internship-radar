@@ -71,6 +71,14 @@ same commit.
 - **No prestige bypass.** Unmatched titles do not ship; T1/T2 drops are logged to
   `data/dropped_unmatched.jsonl` for pattern PROPOSALS, never auto-adds.
 - **Nothing expires on age.** The queue is worked to zero; rows leave only when tapped.
+  A role that got an Apply-Now email stays in the digest past the freshness window and
+  past a re-score under the floor, until it is tapped or confirmed closed.
+- **Closed means every copy, twice.** The digest shows one row per role
+  (`queue_state.families`: shared ATS req id, else company + title with badge/emoji/
+  "The … Company" noise ignored). A role drops only when every copy's link is confirmed
+  closed, and a link is confirmed only by two closed readings ≥20h apart
+  (`liveness.CONFIRM_GAP_H`); one reading is a "suspect", held for a day. Postings do get
+  pulled and reposted under the same URL, so a single reading is not proof.
 - **Defer, don't degrade.** If the eligibility joint cannot run clean, do not send.
   Backstop 18:00. `_mark_deferred()` must record why, or the watchdog cries wolf.
 - **A 404 is safe; a wrong 200 is not.** Every identity-bearing fetch goes through

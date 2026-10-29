@@ -41,6 +41,32 @@ def queue_newsletters(newsletters, seen, q, now=None, max_age_days=14):
             print(f"[warn] newsletter {nl['name']}: {ex}")
     return n
 
+SCRAPERS = ("apple", "google", "meta")
+
+def scraper_alarms(postings, errors, health, today):
+    """Per-site run of failing mornings -> sites to email about. Meta and Google returned
+    0 rows for weeks with nothing but a log line (found 2026-10-28, after the operator applied
+    to a Meta intern the radar never saw). A raise or a 0-row result counts as failing;
+    the email goes out on the 2nd morning in a row (one bad morning is often the site
+    hiccuping) and weekly after that. `health` is updated in place."""
+    failing = {e.split(":", 1)[0]: e for e in errors}
+    for name in SCRAPERS:
+        if name not in failing and not any(p.get("source") == f"scrapling:{name}" for p in postings):
+            failing[name] = f"{name}: 0 rows"
+    alarms = []
+    for name in SCRAPERS:
+        h = health.setdefault(name, {"streak": 0, "day": ""})
+        if name not in failing:
+            h.update(streak=0, day=today, why="")
+            continue
+        if h.get("day") != today:                 # a same-day rerun is not a new morning
+            h["streak"] = h.get("streak", 0) + 1
+        h.update(day=today, why=failing[name][:200])
+        if h["streak"] >= 2 and (h["streak"] - 2) % 7 == 0 and h.get("alerted_day") != today:
+            h["alerted_day"] = today
+            alarms.append((name, h["streak"], h["why"]))
+    return alarms
+
 def main():
     sh("git pull --ff-only")
     from radar.scrapling_fetch import fetch_all_scrapling
@@ -73,6 +99,28 @@ def main():
             n += 1
     json.dump(seen, open(seenp, "w"))
     print(f"scrapling scraped {len(postings)} listings, {n} new scored")
+
+    hp = os.path.join(REPO, "data", "scrape_health.json")
+    try:
+        with open(hp) as fh:
+            health = json.load(fh)
+    except (OSError, ValueError):
+        health = {}
+    for name, streak, why in scraper_alarms(postings, errors, health, time.strftime("%Y-%m-%d")):
+        try:
+            sys.path.insert(0, os.path.expanduser("~/.claude/tools"))
+            import mailer
+            from radar.settings import SEND_AS, TO_ADDR
+            mailer.send(SEND_AS, TO_ADDR, f"⚠️ Radar scraper broken — {name} ({streak} mornings)",
+                        f"<p>The <b>{name}</b> careers scraper has failed {streak} mornings in a row, "
+                        f"so its internships are not reaching the digest.</p><p><code>{why}</code></p>"
+                        f"<p>Fix in <code>radar/scrapling_fetch.py</code>; parser tests in "
+                        f"<code>tests/test_scrapling_parsers.py</code>.</p>")
+            print(f"[alert] scraper {name} failing {streak} mornings -> emailed")
+        except Exception as ex:
+            print(f"[warn] scraper alarm email failed ({name}): {ex}")
+    with open(hp, "w") as fh:
+        json.dump(health, fh, indent=1, sort_keys=True)
 
     sources = yaml.safe_load(open(os.path.join(REPO, "config", "sources.yaml")))
     with open(qp, "a") as q:

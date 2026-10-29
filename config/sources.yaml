@@ -117,6 +117,10 @@ ats:
   - {name: Intel, ats: workday, token: "intel@wd1/External"}
   # Micron: its intern feed ignores searchText, so fetch_workday uses the intern facet.
   - {name: Micron Technology, ats: workday, token: "micron@wd1/External"}
+  # Accenture: its interns are "Summer Analyst/Associate" and it posts worldwide, so the
+  # search is "summer" filtered to the United States country facet: one request a poll.
+  - {name: Accenture, ats: workday, token: "accenture@wd103/AccentureCareers", search: "summer",
+     facets: {locationCountry: ["bc33aa3152ec42d4995f4791a106ed09"]}}
   - {name: Disney, ats: workday, token: "disney@wd5/disneycareer"}
   - {name: Target, ats: workday, token: "target@wd5/targetcareers"}
   - {name: Home Depot, ats: workday, token: "homedepot@wd5/CareerDepot"}

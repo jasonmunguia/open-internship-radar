@@ -12,11 +12,17 @@ Three layers, cheapest first (each layer only sees what the previous could not j
   2. Scrapling StealthyFetcher renders the unsure pages (JS apps, anti-bot walls)
   3. the `liveness` Claude joint judges rendered text that still reads ambiguous
 
-Verdicts persist in data/liveness.json: dead is PERMANENT (a closed req does not
-reopen under the same URL; if it truly does, the fetchers will re-see it as a new row),
-live expires after LIVE_TTL_H. Rows that end unsure are HELD out of the email and
-retried tomorrow — never shipped unverified, and never deleted (a false "dead" hides
-a real job, so unsure is a hold, not a verdict).
+Verdicts persist in data/liveness.json: live expires after LIVE_TTL_H. Dead is
+PERMANENT, but only once CONFIRMED — two closed readings at least CONFIRM_GAP_H apart
+(2026-10-28 per the operator). One reading is a "suspect": held out of that email and checked
+again the next day. A single reading used to be final, and reqs DO come back under the
+same URL: Salesforce's Product GTM Strategy intern (T1, alerted 10-26) read closed at
+06:07 mid-repost and was hidden for good while Workday said canApply=true. A re-probe of
+83 rows marked dead that day found 4 open. Legacy single-reading dead entries (no
+`confirmed` field) count as a first strike, so they get exactly one more look.
+Rows that end unsure are HELD out of the email and retried tomorrow — never shipped
+unverified, and never deleted (a false "dead" hides a real job, so unsure is a hold,
+not a verdict).
 """
 import json
 import os
@@ -28,6 +34,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 CACHE = os.path.join(os.path.dirname(__file__), "..", "data", "liveness.json")
 LIVE_TTL_H = 20                     # a live verdict is good for one send cycle, not two
+# Second closed reading must come from a later day's send. 20h, not 24: the digest's send
+# time drifts with wake-ups (06:29 one day, 06:05 the next), and a 24h rule would push
+# every confirmation a further day out.
+CONFIRM_GAP_H = 20
 _UA = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
                      "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
@@ -210,13 +220,30 @@ def _partition(to_check):
     return paced, pooled
 
 
+def confirmed_dead(v):
+    """A verdict that is final: two closed readings CONFIRM_GAP_H apart, or no URL at all."""
+    return v.get("status") == "dead" and bool(v.get("confirmed") or v.get("why") == "no-url")
+
+
+def first_strike(v):
+    """When an unconfirmed closed reading was first taken, else None. Legacy dead
+    entries (written before confirmation existed) count, dated by their own ts."""
+    if v.get("status") == "suspect":
+        return v.get("first_dead") or v.get("ts")
+    if v.get("status") == "dead" and not confirmed_dead(v):
+        return v.get("ts")
+    return None
+
+
 def sweep(rows, allow_network=True):
     """Gate rows on liveness. Returns (live, dead, unsure, quality) where quality is
-    {checked, from_cache, error} — callers MUST inspect it (a checker that degrades
-    without reporting is how the eligibility filter died silently for days).
+    {checked, from_cache, error, suspect} — callers MUST inspect it (a checker that
+    degrades without reporting is how the eligibility filter died silently for days).
+    `dead` holds only confirmed closures; a first closed reading lands in `unsure` and
+    is counted in quality["suspect"].
 
     allow_network=False (DRY runs) consults the cache only and writes nothing: cached
-    dead rows still drop, everything unverifiable is held."""
+    confirmed-dead rows still drop, everything unverifiable is held."""
     from radar.queue_state import job_id
     cache = _load()
     now = time.time()
@@ -231,20 +258,32 @@ def sweep(rows, allow_network=True):
             dead.append(r)
             continue
         v = cache.get(jid) or {}
-        if v.get("status") == "dead":
+        if confirmed_dead(v):
             dead.append(r)
         elif v.get("status") == "live" and now - v.get("ts", 0) < LIVE_TTL_H * 3600:
             live.append(r)
         else:
             to_check.append((jid, r))
-    q = {"checked": 0, "from_cache": len(rows) - len(to_check), "error": None}
+    q = {"checked": 0, "from_cache": len(rows) - len(to_check), "error": None, "suspect": 0}
     if not allow_network:
         unsure.extend(r for _, r in to_check)
         return live, dead, unsure, q
 
     def _settle(jid, r, verdict):
-        cache[jid] = {"status": verdict, "ts": int(now), "url": r.get("url", "")}
-        (live if verdict == "live" else dead).append(r)
+        rec = {"status": verdict, "ts": int(now), "url": r.get("url", "")}
+        if verdict == "live":
+            cache[jid] = rec
+            live.append(r)
+            return
+        first = first_strike(cache.get(jid) or {})
+        if first and now - first >= CONFIRM_GAP_H * 3600:
+            cache[jid] = {**rec, "first_dead": int(first), "confirmed": int(now)}
+            dead.append(r)
+        else:
+            # One closed reading is not proof: hold it, look again on the next day's send.
+            cache[jid] = {**rec, "status": "suspect", "first_dead": int(first or now)}
+            q["suspect"] += 1
+            unsure.append(r)
 
     # Layer 1 — independent and I/O-bound, so threads (parallel iff reordering is a no-op)
     # — except PACED_HOSTS, which answer a 12-wide burst with a bot challenge (jobright,

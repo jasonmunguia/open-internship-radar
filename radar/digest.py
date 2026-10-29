@@ -310,11 +310,79 @@ def rescore_and_partition(rows, profile, funded, tier_cache):
         r["score"] = s
         r.update(brief)
         if brief["tier"] in PASSING_TIERS:
-            if s >= DISPLAY_FLOOR:
+            # An alerted role already earned its place (2026-10-28): a rule change that
+            # drops its score under the floor must not quietly retract the alert.
+            if s >= DISPLAY_FLOOR or r.get("_alerted"):
                 passing.append(r)
         elif s + BAND_POINTS[1] >= DISPLAY_FLOOR:
             unverified.append(r)
     return passing, unverified
+
+
+def standing_roles(cands, seen, fresh_days, since):
+    """One row per ROLE (queue_state.families), kept if any copy is inside the freshness
+    window or the role ever got an Apply-Now alert (its alert key is in seen.json).
+    Returns (roles, copies): copies maps id(role row) -> that role's other rows, for the
+    tap check and the liveness fallback."""
+    from radar.poll import alert_keys
+    from radar.queue_state import families
+    roles, copies = [], {}
+    for fam in families(cands):
+        fresh = [r for r in fam if within_days(r, fresh_days)]
+        alerted = any(k and k in seen for r in fam for k in alert_keys(r))
+        if not (fresh or alerted):
+            continue
+        rep = (fresh or fam)[0]               # earliest copy: keeps its day-N counter
+        rep["_new"] = rep.get("ts", 0) > since   # starred in the email
+        rep["_alerted"] = alerted
+        copies[id(rep)] = [r for r in fam if r is not rep]
+        roles.append(rep)
+    return roles, copies
+
+
+def family_liveness(live, dead, unsure, quality, copies, allow_network=True):
+    """A role is closed only when EVERY copy of it is (2026-10-28). The sweep
+    judges each role by one representative link; for any role it did not find open, try
+    the role's other copies (direct ATS links first: aggregator links expire and get
+    bot-walled) until one is open or none are left. An open copy ships with its own link.
+    Outcome per role: open beats unsure beats closed, so a role drops only when every
+    copy came back confirmed closed. `quality` is updated in place."""
+    from radar.liveness import sweep
+    from radar.queue_state import req_id
+    status, reps, alts = {}, {}, {}
+    for state, rows in (("dead", dead), ("unsure", unsure)):
+        for r in rows:
+            i = id(r)
+            status[i], reps[i] = state, r
+            urls, ordered = {r.get("url")}, []
+            for c in sorted(copies.get(i, ()), key=lambda c: req_id(c.get("url", "")) is None):
+                if c.get("url") and c["url"] not in urls:
+                    urls.add(c["url"])
+                    ordered.append(c)
+            alts[i] = ordered
+    rescued = []
+    while True:
+        trial = [(i, {**reps[i], "url": alts[i][0]["url"],
+                      "source": alts[i][0].get("source", reps[i].get("source"))})
+                 for i in reps if status[i] != "live" and alts[i]]
+        if not trial:
+            break
+        for i, _t in trial:
+            alts[i].pop(0)
+        ok, _gone, held, q2 = sweep([t for _, t in trial], allow_network=allow_network)
+        quality["checked"] += q2["checked"]
+        quality["suspect"] = quality.get("suspect", 0) + q2.get("suspect", 0)
+        quality["error"] = quality.get("error") or q2["error"]
+        ok_ids, held_ids = {id(x) for x in ok}, {id(x) for x in held}
+        for i, t in trial:
+            if id(t) in ok_ids:
+                status[i] = "live"
+                rescued.append(t)
+            elif id(t) in held_ids and status[i] == "dead":
+                status[i] = "unsure"
+    return (live + rescued,
+            [reps[i] for i in reps if status[i] == "dead"],
+            [reps[i] for i in reps if status[i] == "unsure"])
 
 
 def main():
@@ -375,42 +443,48 @@ def main():
         except Exception as ex:
             print(f"[warn] rescue eligibility filter unavailable: {ex}")
 
-    # STANDING apply list: every role currently open <=fresh_days, fit >=55, deduped by company+title.
+    # STANDING apply list: every role currently open <=fresh_days, fit >=55, one row per role.
     # NOTE the stored score is NOT trusted here — the tier gate below re-scores every
     # candidate with the current rules, so a stale ingest-time score can neither ship a
     # row (old inflated 58s) nor hide one (a company whose tier improved since ingest).
-    seen_ct, roles = set(), []
+    from radar import queue_state as qs
+    cands = []
     for r in allrows:
         # gov/usajobs are NO LONGER dropped (2026-08-08): IC + cleared roles are a T1 target.
         # Only newsletter rows are excluded here — they are leads, not postings.
         if r.get("cluster") == "newsletter":
             continue
-        if not within_days(r, fresh_days):
-            continue
         # US-only. Belt-and-braces: catches rows scored before the location gate existed.
         if not is_us_location(r.get("location", ""), r.get("department", "")):
             continue
-        key = (r.get("company", "").lower(), r.get("title", "").lower())
-        if key in seen_ct:
-            continue
-        seen_ct.add(key)
-        r["_new"] = r.get("ts", 0) > since   # starred in the email
-        roles.append(r)
+        cands.append(r)
+    # A role that got an Apply-Now email stays until it is tapped or confirmed closed,
+    # whatever its posting date (2026-10-28): a req posted months before the radar first
+    # saw it would otherwise alert one evening and vanish from the next morning's list.
+    try:
+        with open(os.path.join(REPO_DIR, "data", "seen.json")) as fh:
+            _seen = json.load(fh)
+    except (OSError, ValueError):
+        _seen = {}
+    roles, _copies = standing_roles(cands, _seen, fresh_days, since)
 
     # QUEUE STATE: a row leaves the apply list only when the operator taps it. Nothing ages out on
     # its own — the "day N" counter is the pressure instead. See radar/queue_state.py.
-    from radar import queue_state as qs
     # A tap clears the ROLE, not the URL (2026-09-02): the same req reaches the queue
     # from several boards under several ids, so the applied set is matched as a family —
     # id, then ATS requisition id, then company+title. See queue_state.done_state.
+    # A tap on ANY copy in the role's family clears it (families also merge company-name
+    # variants like "Disney" / "The Walt Disney Company" that is_done alone would miss).
+    def _tapped(rep, done):
+        return any(qs.is_done(r, done) for r in [rep] + _copies[id(rep)])
     _done = qs.done_state(allrows)
-    roles = [r for r in roles if not qs.is_done(r, _done)]
+    roles = [r for r in roles if not _tapped(r, _done)]
     # 👍/👎 verdict taps (2026-08-15): a 👎 is a tap, so the row leaves the list —
     # consistent with "rows leave only when tapped". A 👍 keeps the row (the operator
     # still has to apply) and marks it. Mis-taps recover via the flip link, last tap wins.
     _verd = qs.verdicts()
     _no = qs.done_state(allrows, ids={k for k, v in _verd.items() if v == "no"})
-    roles = [r for r in roles if not qs.is_done(r, _no)]
+    roles = [r for r in roles if not _tapped(r, _no)]
 
     # ---- TIER GATE (2026-08-22 per the operator): every apply recommendation must be T1-T3 ----
     # (or freshly funded). Three layers, in order:
@@ -460,10 +534,15 @@ def main():
     # tier gate would discard anyway.
     from radar.liveness import sweep as _live_sweep
     roles, _lv_dead, _lv_unsure, _lv_q = _live_sweep(roles, allow_network=not DRY)
+    roles, _lv_dead, _lv_unsure = family_liveness(roles, _lv_dead, _lv_unsure, _lv_q, _copies,
+                                                  allow_network=not DRY)
     if _lv_dead:
-        print(f"[liveness] dropped {len(_lv_dead)} dead postings: "
+        print(f"[liveness] dropped {len(_lv_dead)} closed roles (every copy confirmed closed): "
               + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _lv_dead[:15])
               + ("" if len(_lv_dead) <= 15 else f" … +{len(_lv_dead) - 15} more"))
+    if _lv_q.get("suspect"):
+        print(f"[liveness] {_lv_q['suspect']} links read closed for the first time — held, "
+              f"rechecked tomorrow before anything is dropped")
     if _lv_unsure:
         print(f"[liveness] held {len(_lv_unsure)} unverifiable rows (retry tomorrow): "
               + "; ".join(f"{r.get('company','?')} — {str(r.get('title',''))[:40]}" for r in _lv_unsure[:15])

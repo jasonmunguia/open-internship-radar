@@ -107,10 +107,14 @@ def bucket(row):
         return "This week"
     if age <= 14:
         return "Last week"
-    return "This month"
+    if age <= 31:
+        return "This month"
+    # Alerted roles now stay past the freshness window (2026-10-28), so an Apple req
+    # posted in May would otherwise sit under "This month".
+    return "Older (alerted)"
 
 
-BUCKET_ORDER = ["Today", "This week", "Last week", "This month"]
+BUCKET_ORDER = ["Today", "This week", "Last week", "This month", "Older (alerted)"]
 
 
 def relay(url, row, base, action="applied", override_id=None):
@@ -202,14 +206,16 @@ _REQ = (
     ("gh",   re.compile(r"[?&](?:gh_jid|token)=(\d+)")),
     ("gh",   re.compile(r"greenhouse\.io/[^/?#]+/jobs/(\d+)")),
     ("uuid", re.compile(r"(?:ashbyhq\.com|lever\.co)/[^/]+/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")),
-    ("wd",   re.compile(r"myworkdayjobs\.com/.*_((?:jr|r)?\d{4,})(?=[/?#]|$)")),
+    # Workday: Visa-style REF089881W ids, and the "-1"/"-2" Workday appends when one req is
+    # posted to a second career site (Salesforce JR362217 vs JR362217-1), 2026-10-28.
+    ("wd",   re.compile(r"myworkdayjobs\.com/.*_((?:jr|r|ref)?\d{4,}[a-z]?)(?:-\d{1,2})?(?=[/?#]|$)")),
     ("sr",   re.compile(r"smartrecruiters\.com/[^/]+/(\d{10,})")),
     ("job",  re.compile(r"/job/(\d{6,})(?=[/?#]|$)")),          # Oracle CX + careers.* mirrors
     ("apple", re.compile(r"jobs\.apple\.com/[^/]+/details/(\d{6,})")),  # positionId, shared across locations
     # zapply redirect slugs embed the ATS req: workday-micron-external-JR115941 is the same
     # req as Micron's own ..._JR115941. Without these, adding a direct feed re-alerts every
     # role zapply already alerted (Micron, 2026-10-27).
-    ("wd",   re.compile(r"zapply\.jobs/l/d/workday-[^?#]+-((?:jr|r)?\d{4,})(?=[/?#]|$)")),
+    ("wd",   re.compile(r"zapply\.jobs/l/d/workday-[^?#]+-((?:jr|r|ref)?\d{4,}[a-z]?)(?=[/?#]|$)")),
     ("gh",   re.compile(r"zapply\.jobs/l/d/greenhouse-[^/?#]+-(\d{6,})(?=[/?#]|$)")),
 )
 
@@ -243,6 +249,57 @@ def role_key(row):
     terms = frozenset(_TERM.findall(t))
     core = re.sub(r"\s+", " ", _TERM.sub(" ", t)).strip()
     return co, core, terms
+
+
+_CO_NOISE = {"the", "inc", "llc", "ltd", "co", "corp", "corporation", "company", "group",
+             "holdings", "plc"}
+
+def same_company(a, b):
+    """'NVIDIA ✓' is 'Nvidia', and 'The Walt Disney Company' is 'Disney': one name's
+    words contain the other's. Only ever asked about rows whose titles already match,
+    which is what keeps a short name from swallowing an unrelated company."""
+    ta = {t for t in _norm(a).split() if t not in _CO_NOISE}
+    tb = {t for t in _norm(b).split() if t not in _CO_NOISE}
+    return bool(ta and tb) and (ta <= tb or tb <= ta)
+
+
+def families(rows):
+    """Group queue rows that are ONE requisition reaching the queue from several boards
+    (2026-10-28). The digest used to merge only exact company+title matches, so 'NVIDIA ✓
+    ... 🆕' and 'Nvidia ...' each got a row, and its liveness check judged a role by one
+    copy's link: IQVIA's dead jobright link hid a role whose speedrun copy was never
+    checked. Same twin rules as is_done: a shared ATS req id, else same company and title
+    with compatible terms — unless the rows carry different req ids from the same ATS
+    (Microsoft posts one 'Product Manager Intern' req per office). Each family keeps
+    queue order; families come back in order of first appearance."""
+    fams, fam_rids, by_req, by_core = [], [], {}, {}
+    for r in rows:
+        rid = req_id(r.get("url", ""))
+        _co, core, terms = role_key(r)
+        idx = by_req.get(rid) if rid else None
+        if idx is None and core:
+            for i in by_core.get(core, ()):
+                head = fams[i][0]
+                if not same_company(r.get("company", ""), head.get("company", "")):
+                    continue
+                hterms = role_key(head)[2]
+                if not (hterms <= terms or terms <= hterms):
+                    continue
+                if rid and any(o.split(":")[0] == rid.split(":")[0] and o != rid for o in fam_rids[i]):
+                    continue
+                idx = i
+                break
+        if idx is None:
+            idx = len(fams)
+            fams.append([])
+            fam_rids.append(set())
+            if core:
+                by_core.setdefault(core, []).append(idx)
+        fams[idx].append(r)
+        if rid:
+            fam_rids[idx].add(rid)
+            by_req.setdefault(rid, idx)
+    return fams
 
 
 def done_state(rows, ids=None):

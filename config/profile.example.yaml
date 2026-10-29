@@ -62,7 +62,9 @@ clusters:
   consulting:
     weight: 40
     angle: consulting
-    patterns: ["business analyst", "consultant", "consulting", "strategy analyst"]
+    # "advisory" (2026-10-28): "Entry Level Advisory Summer Analyst" matched no family. To keep
+    # accounting-firm advisory out, add an `exclude` list (e.g. "\\btax\\b", "\\brisk\\b").
+    patterns: ["business analyst", "consultant", "consulting", "strategy analyst", "\\badvisory\\b"]
   vc:
     weight: 40
     angle: founder
@@ -118,7 +120,9 @@ scoring:
   # "intern" is word-bounded (allowing intern/interns/internship/internships) so it can
   # never match inside "international" or "internal" — bare "intern" would pass any
   # posting whose title or description says "international" through the gate.
-  gate_patterns: ["\\bintern(ship)?s?\\b", "co-?op", "fellow", "apprentice", "student", "undergrad", "university program", "campus", "sophomore", "junior year"]
+  # "summer analyst" (2026-10-28): banks and consultancies name their interns that, so
+  # titles like Accenture's US program never passed this gate.
+  gate_patterns: ["\\bintern(ship)?s?\\b", "\\bsummer analysts?\\b", "co-?op", "fellow", "apprentice", "student", "undergrad", "university program", "campus", "sophomore", "junior year"]
   # Any hit in the TITLE disqualifies, even if a gate pattern also matched.
   # NB: "full-time" is NOT excluded, because a full-time *internship* is still an internship.
   # NB: plain "manager" is NOT excluded — "Product/Program Manager Intern" are valid. Only senior titles.
