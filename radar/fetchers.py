@@ -235,12 +235,32 @@ def fetch_substack(name, sub):
                         "source": f"substack:{sub}"})
     return out
 
+# Version tag on every watch hash. Bump it whenever watch_text() changes what it
+# hashes: watch_changed() treats a hash from another version as "no baseline", so the
+# change of method re-baselines every page silently instead of alerting on all of them.
+WATCH_V = "m1:"
+
+def watch_text(html):
+    """The text a watch hash covers: the page's <main> block when it has one.
+
+    Site chrome is not program content. nasa.gov's mega-menu carries a rotating news
+    feed with relative dates ("3 days ago"), and CDN nodes serve different copies of
+    it, so hashing the whole page flipped on nearly every poll (30-48 false [watch]
+    alerts a day per NASA page, 2026-11-11 to 11-15) while <main> never changed.
+    """
+    m = re.search(r"<main\b.*?</main>", html, flags=re.DOTALL)
+    text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ",
+                  m.group(0) if m else html, flags=re.DOTALL)
+    return re.sub(r"\s+", " ", text).strip()
+
 def watch_page(name, url):
     """Hash a program page; caller diffs the hash to detect cohort openings."""
     import hashlib
-    text = re.sub(r"<script.*?</script>|<style.*?</style>|<[^>]+>", " ", _get(url), flags=re.S)
-    text = re.sub(r"\s+", " ", text).strip()
-    return hashlib.sha1(text.encode()).hexdigest()
+    return WATCH_V + hashlib.sha1(watch_text(_get(url)).encode()).hexdigest()
+
+def watch_changed(old, new):
+    """True only when both hashes are the current version and differ."""
+    return bool(old) and old.startswith(WATCH_V) and old != new
 
 def _post_hdr(url, body, headers, timeout=20):
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)

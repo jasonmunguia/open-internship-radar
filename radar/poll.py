@@ -2,7 +2,7 @@
 import hashlib, json, os, re, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 import yaml
-from radar.fetchers import fetch_all, watch_page, is_posting_live
+from radar.fetchers import fetch_all, watch_page, watch_changed, is_posting_live
 from radar.queue_state import relay as qs_relay, req_id
 from radar.score import score_posting, is_us_location
 from radar.settings import MENTION, RELAY_BASE
@@ -320,7 +320,7 @@ def main():
             key = f"page:{w['url']}"
             old = seen.get(key)
             seen[key] = h
-            if old and old != h and gh_token:
+            if watch_changed(old, h) and gh_token:
                 create_issue(gh_repo, gh_token,
                              f"[watch] {w['name']} page changed — possible cohort/app opening",
                              f"{w['url']} content changed since last check. If applications opened, "
