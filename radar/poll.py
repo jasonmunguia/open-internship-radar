@@ -2,7 +2,7 @@
 import hashlib, json, os, re, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 import yaml
-from radar.fetchers import fetch_all, watch_page, watch_changed, is_posting_live
+from radar.fetchers import fetch_all, watch_page, watch_changed, watch_active, is_posting_live
 from radar.queue_state import relay as qs_relay, req_id
 from radar.score import score_posting, is_us_location
 from radar.settings import MENTION, RELAY_BASE
@@ -310,7 +310,8 @@ def main():
             return watch_page(w["name"], w["url"]), None
         except Exception as ex:
             return None, ex
-    _pages = sources.get("watch_pages", [])
+    _today = time.strftime("%Y-%m-%d", time.gmtime())
+    _pages = [w for w in sources.get("watch_pages", []) if watch_active(w, _today)]
     with ThreadPoolExecutor(8) as ex:
         _hashes = list(ex.map(_watch, _pages))
     for w, (h, err) in zip(_pages, _hashes):

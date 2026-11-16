@@ -262,6 +262,15 @@ def watch_changed(old, new):
     """True only when both hashes are the current version and differ."""
     return bool(old) and old.startswith(WATCH_V) and old != new
 
+def watch_active(w, today):
+    """False while a watch page's optional `active_from` is after `today` (both YYYY-MM-DD).
+
+    Lets a page sit dormant between application cycles and switch itself back on
+    (NASA Pathways: closed 2026-09-25, summer dates post in early 2027).
+    """
+    start = w.get("active_from")
+    return not start or str(start)[:10] <= today
+
 def _post_hdr(url, body, headers, timeout=20):
     req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
     with urllib.request.urlopen(req, timeout=timeout) as r:

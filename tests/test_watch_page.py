@@ -39,3 +39,25 @@ def test_old_unversioned_hash_rebaselines_silently(monkeypatch):
     assert new.startswith(WATCH_V)
     assert not watch_changed(legacy, new)
     assert not watch_changed(None, new)
+
+
+def test_active_from_keeps_a_watch_dormant_until_its_date():
+    from datetime import date
+
+    from radar.fetchers import watch_active
+    w = {"name": "n", "url": "u", "active_from": "2027-01-15"}
+    assert not watch_active(w, "2027-01-14")
+    assert watch_active(w, "2027-01-15")
+    assert watch_active({"name": "n", "url": "u"}, "2026-11-15")
+    assert watch_active({"active_from": date(2027, 1, 15)}, "2027-02-01")  # unquoted YAML date
+
+
+def test_pathways_watch_is_configured_dormant():
+    import os
+
+    import yaml
+    path = os.path.join(os.path.dirname(__file__), "..", "config", "sources.yaml")
+    with open(path) as f:
+        pages = yaml.safe_load(f)["watch_pages"]
+    nasa = [w for w in pages if "careers/pathways" in w["url"]]
+    assert not nasa or str(nasa[0].get("active_from"))[:10] == "2027-01-15"
