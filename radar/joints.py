@@ -101,6 +101,34 @@ def run_joint(name, prompt, timeout=None, model=None, **run_kw):
                           timeout=timeout or j["timeout"], **run_kw)
 
 
+def extract_json_array(text):
+    """Pull the model's JSON array out of CLI stdout.
+
+    Slicing first-'[' .. last-']' (the old idiom) breaks whenever the model adds anything
+    bracketed after the array — a second array, a "[note]" — and json.loads raises
+    "Extra data". That deferred the 2026-11-15 and 11-17 digests on otherwise-good
+    replies. raw_decode parses ONE value at each '[' and ignores whatever follows.
+    Prefers the first array whose items are all objects (the reply shape every joint
+    asks for); falls back to the first array of any shape; raises ValueError if none."""
+    import json, re
+    dec = json.JSONDecoder()
+    first = None
+    for m in re.finditer(r"\[", text or ""):
+        try:
+            val, _end = dec.raw_decode(text, m.start())
+        except ValueError:
+            continue
+        if not isinstance(val, list):
+            continue
+        if all(isinstance(v, dict) for v in val):
+            return val
+        if first is None:
+            first = val
+    if first is not None:
+        return first
+    raise ValueError("no JSON array in model output: " + (text or "<empty>").strip()[:80])
+
+
 def llm_available(timeout=45):
     """ACTUALLY invoke the CLI. An earlier version returned `shutil.which("claude") is
     not None` — true whenever the binary is on disk, i.e. always — so the digest's defer

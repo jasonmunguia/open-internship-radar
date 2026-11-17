@@ -145,7 +145,7 @@ def discover(families=None, timeout=None, per_query=None):
     bounded call and its own log line; a family that fails costs itself, not the night."""
     import json as _json
 
-    from radar.joints import run_joint
+    from radar.joints import extract_json_array, run_joint
     fams = [f for f in (families or list(FAMILY_QUERIES)) if f in FAMILY_QUERIES]
     known_set, known_recent = _known_urls()
     known_block = ""
@@ -173,7 +173,7 @@ def discover(families=None, timeout=None, per_query=None):
             r = run_joint("discovery", prompt, timeout=timeout)
             body = r.stdout
             body = body.split("```")[1].lstrip("json").strip() if "```" in body else body.strip()
-            rows = _json.loads(body[body.find("["):body.rfind("]") + 1])
+            rows = extract_json_array(body)
         except Exception as ex:
             print(f"[discover] {fam}: model pass failed ({type(ex).__name__})")
             failed.append(fam)

@@ -172,7 +172,7 @@ def _judge_batch(batch):
     """Layer 3: the `liveness` joint judges rendered text the markers could not.
     batch: [(jid, row, excerpt)]. Returns ({jid: 'live'|'dead'}, error_or_None) —
     anything the model does not decisively settle stays out of the mapping (held)."""
-    from radar.joints import run_joint
+    from radar.joints import extract_json_array, run_joint
     items = [{"i": i, "company": r.get("company", ""), "title": r.get("title", ""),
               "url": r.get("url", ""), "page_text": (ex or "")[:1200]}
              for i, (_jid, r, ex) in enumerate(batch)]
@@ -191,9 +191,8 @@ def _judge_batch(batch):
     try:
         res = run_joint("liveness", prompt)
         out = res.stdout
-        js = out[out.find("["):out.rfind("]") + 1]
         verdicts = {}
-        for v in json.loads(js):
+        for v in extract_json_array(out):
             if v.get("status") in ("live", "dead"):
                 verdicts[batch[int(v["i"])][0]] = v["status"]
         return verdicts, None

@@ -8,7 +8,7 @@ showing is decided upstream by role family + company tier. It was previously nam
 silently graded resume-fit and deleted qualifying jobs. Renamed 2026-08-09."""
 import json, os
 
-from radar.joints import JOINTS, run_joint
+from radar.joints import JOINTS, extract_json_array, run_joint
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -70,8 +70,7 @@ def filter_ineligible(items, band=(40, 82), batch_size=None, timeout=None):
         try:
             out = run_joint("eligibility", _prompt(batch), timeout=timeout)
             txt = out.stdout.strip()
-            js = txt[txt.find("["):txt.rfind("]") + 1]
-            for v in json.loads(js):
+            for v in extract_json_array(txt):
                 r = batch[int(v["i"])]
                 r["eligibility_note"] = v.get("why", "")
                 # The model may only REMOVE the impossible. It may not re-rank by taste:

@@ -74,3 +74,16 @@ def test_availability_probe_pins_the_model_it_gates():
     src = inspect.getsource(joints.llm_available)
     assert '"--model", JOINTS["eligibility"]["model"]' in src
 
+
+
+def test_extract_json_array_ignores_trailing_text():
+    """2026-11-17: '[...]\\n[note]' after the reply raised 'Extra data' and deferred the digest."""
+    from radar.joints import extract_json_array
+    out = '[{"i":0,"status":"live"},{"i":1,"status":"dead"}]\n\nNote: [1] needed WebFetch.'
+    assert extract_json_array(out) == [{"i": 0, "status": "live"}, {"i": 1, "status": "dead"}]
+    # a second array after the first, and prose with brackets before it
+    assert extract_json_array('Checked [2] pages:\n[{"i":0}]\n[{"i":9}]') == [{"i": 0}]
+    assert extract_json_array("```json\n[]\n```") == []
+    import pytest
+    with pytest.raises(ValueError):
+        extract_json_array("You've hit your 5-hour limit")
